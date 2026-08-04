@@ -7,24 +7,36 @@ import type { SystemAgentChatEngine } from "../../system-agent/chat-engine.js";
 type SystemAgentChatReply = Awaited<ReturnType<SystemAgentChatEngine["handle"]>>;
 type SystemAgentChatEngineInput = Pick<
   SystemAgentChatEngine,
-  "answerWizard" | "cancelWizard" | "handle"
+  "answerWizard" | "cancelWizard" | "handle" | "pollStep"
 >;
 
 export function getSystemAgentChatInputError(params: SystemAgentChatParams): string | undefined {
-  if (params.message !== undefined && params.wizardAnswer !== undefined) {
-    return "Send either message or wizardAnswer, not both.";
-  }
-  if (params.wizardAnswer !== undefined && params.delegation !== undefined) {
-    return "Delegated OpenClaw sessions cannot submit structured wizard answers.";
-  }
-  if (params.wizardAnswer !== undefined && params.reset === true) {
-    return "A wizard answer cannot reset its OpenClaw chat session.";
+  const inputCount = [
+    params.message,
+    params.wizardAnswer,
+    params.wizardCancel,
+    params.pollStepId,
+  ].filter((value) => value !== undefined).length;
+  if (inputCount > 1) {
+    return "Send exactly one of message, wizardAnswer, wizardCancel, or pollStepId.";
   }
   if (
-    params.wizardCancel !== undefined &&
-    (params.message !== undefined || params.wizardAnswer !== undefined)
+    (params.wizardAnswer !== undefined || params.pollStepId !== undefined) &&
+    params.delegation !== undefined
   ) {
-    return "Send wizardCancel without a message or wizardAnswer.";
+    return "Delegated OpenClaw sessions cannot answer or poll structured wizard steps.";
+  }
+  if (
+    (params.wizardAnswer !== undefined || params.pollStepId !== undefined) &&
+    params.reset === true
+  ) {
+    return "A wizard answer or poll cannot reset its OpenClaw chat session.";
+  }
+  if (
+    params.pollStepId !== undefined &&
+    (params.welcomeVariant !== undefined || params.context !== undefined)
+  ) {
+    return "A wizard poll cannot include welcome or UI context.";
   }
   if (params.wizardCancel !== undefined && params.delegation !== undefined) {
     return "Delegated OpenClaw sessions cannot cancel hosted wizards.";
@@ -39,6 +51,9 @@ export async function runSystemAgentChatInput(params: {
   engine: SystemAgentChatEngineInput;
   input: SystemAgentChatParams;
 }): Promise<SystemAgentChatReply | undefined> {
+  if (params.input.pollStepId !== undefined) {
+    return await params.engine.pollStep(params.input.pollStepId);
+  }
   if (params.input.wizardAnswer !== undefined) {
     return await params.engine.answerWizard(params.input.wizardAnswer);
   }

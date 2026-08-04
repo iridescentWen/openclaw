@@ -136,10 +136,43 @@ snapshot, so re-read them on every reconnect.
 
 ### Present system-agent QR codes
 
-`GATEWAY_CLIENT_CAPS.SYSTEM_AGENT_QR_CODE` and the QR wizard-step shape are
-reserved until system-agent QR production and Gateway projection are both
-available. Clients should not advertise this capability yet; the contract alone
-does not make existing Gateway methods emit QR steps.
+Advertise `GATEWAY_CLIENT_CAPS.SYSTEM_AGENT_QR_CODE` only when the client can
+render a QR image and return a deliberate acknowledgement. A pending
+`openclaw.chat` response can then carry a QR `step` through the same wizard-step
+contract used for other setup controls:
+
+```json
+{
+  "step": {
+    "id": "setup-qr",
+    "type": "qr",
+    "title": "Scan QR code",
+    "message": "Scan the code, then continue.",
+    "qrDataUrl": "data:image/png;base64,...",
+    "expiresInMs": 120000,
+    "executor": "client"
+  }
+}
+```
+
+`qrDataUrl` is no longer than 16,384 characters. `expiresInMs` is the remaining
+lifetime when the Gateway emits the response, so remote clients never compare
+the Gateway clock with their own. Acknowledge it with
+`wizardAnswer: { "stepId": "setup-qr" }`.
+
+Keep the QR visible only while that step remains unresolved and for at most
+`step.expiresInMs` after receipt. While it is visible, a client may poll
+`openclaw.chat` with the same `sessionId` and `pollStepId` set to `step.id`; this
+observes owner completion without answering the step. At the deadline, remove
+both the image and acknowledgement action. Discard the image bytes after a
+confirmed or delivery-uncertain acknowledgement. Clients that do not advertise
+the capability retain the prose fallback and never receive a QR step.
+
+The negotiated QR capability is part of an in-memory system-agent session.
+Reconnects may reuse the session only while that capability and the Gateway
+`snapshot.processInstanceId` are unchanged. If the capability changes, the
+process ID changes, or an older Gateway omits the process ID, discard pending QR
+state and call `openclaw.chat` with `reset: true` before continuing.
 
 ## Recover state after reconnect
 

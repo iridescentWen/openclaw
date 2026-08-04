@@ -1436,6 +1436,7 @@ public struct Snapshot: Codable, Sendable {
     public let health: [String: AnyCodable]
     public let stateversion: StateVersion
     public let uptimems: Int
+    public let processinstanceid: String?
     public let appliedconfighash: AnyCodable?
     public let configpath: String?
     public let statedir: String?
@@ -1449,6 +1450,7 @@ public struct Snapshot: Codable, Sendable {
         health: [String: AnyCodable],
         stateversion: StateVersion,
         uptimems: Int,
+        processinstanceid: String? = nil,
         appliedconfighash: AnyCodable? = nil,
         configpath: String? = nil,
         statedir: String? = nil,
@@ -1461,6 +1463,7 @@ public struct Snapshot: Codable, Sendable {
         self.health = health
         self.stateversion = stateversion
         self.uptimems = uptimems
+        self.processinstanceid = processinstanceid
         self.appliedconfighash = appliedconfighash
         self.configpath = configpath
         self.statedir = statedir
@@ -1475,6 +1478,7 @@ public struct Snapshot: Codable, Sendable {
         case health
         case stateversion = "stateVersion"
         case uptimems = "uptimeMs"
+        case processinstanceid = "processInstanceId"
         case appliedconfighash = "appliedConfigHash"
         case configpath = "configPath"
         case statedir = "stateDir"
@@ -10126,6 +10130,7 @@ public struct SystemAgentChatParams: Codable, Sendable {
     public let message: String?
     public let wizardanswer: [String: AnyCodable]?
     public let wizardcancel: [String: AnyCodable]?
+    public let pollstepid: String?
     public let welcomevariant: AnyCodable?
     public let reset: Bool?
     public let context: [String: AnyCodable]?
@@ -10136,6 +10141,7 @@ public struct SystemAgentChatParams: Codable, Sendable {
         message: String? = nil,
         wizardanswer: [String: AnyCodable]? = nil,
         wizardcancel: [String: AnyCodable]? = nil,
+        pollstepid: String? = nil,
         welcomevariant: AnyCodable? = nil,
         reset: Bool? = nil,
         context: [String: AnyCodable]? = nil,
@@ -10145,6 +10151,7 @@ public struct SystemAgentChatParams: Codable, Sendable {
         self.message = message
         self.wizardanswer = wizardanswer
         self.wizardcancel = wizardcancel
+        self.pollstepid = pollstepid
         self.welcomevariant = welcomevariant
         self.reset = reset
         self.context = context
@@ -10156,6 +10163,7 @@ public struct SystemAgentChatParams: Codable, Sendable {
         case message
         case wizardanswer = "wizardAnswer"
         case wizardcancel = "wizardCancel"
+        case pollstepid = "pollStepId"
         case welcomevariant = "welcomeVariant"
         case reset
         case context

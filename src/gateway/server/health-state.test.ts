@@ -64,7 +64,7 @@ async function loadHealthState() {
   return await import("./health-state.js");
 }
 
-describe("buildGatewaySnapshot update metadata", () => {
+describe("buildGatewaySnapshot", () => {
   it.each([
     { role: "operator", scopes: ["operator.pairing"], allowed: false },
     { role: "node", scopes: ["operator.read", "operator.admin"], allowed: false },
@@ -130,6 +130,26 @@ describe("buildGatewaySnapshot update metadata", () => {
 
     expect(snapshot.updateAvailable).toBe(updateAvailable);
     expect(snapshot.updateSchedule).toBe(updateSchedule);
+  });
+
+  it("includes the stable Gateway process identity", async () => {
+    const healthState = await loadHealthState();
+
+    const first = healthState.buildGatewaySnapshot();
+    const second = healthState.buildGatewaySnapshot();
+
+    expect(first.processInstanceId).toEqual(expect.any(String));
+    expect(first.processInstanceId).toBe(second.processInstanceId);
+  });
+
+  it("changes the snapshot identity when an in-process restart rotates ownership", async () => {
+    const healthState = await loadHealthState();
+    const processInstance = await import("../process-instance.js");
+    const before = healthState.buildGatewaySnapshot().processInstanceId;
+
+    processInstance.rotateGatewayProcessInstanceId();
+
+    expect(healthState.buildGatewaySnapshot().processInstanceId).not.toBe(before);
   });
 });
 

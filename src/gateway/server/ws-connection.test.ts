@@ -268,12 +268,27 @@ describe("attachGatewayWsConnectionHandler", () => {
     expect(socket.ping).toHaveBeenCalledOnce();
   });
 
-  it("runs connection-owned Talk cleanup when a gateway connection closes", async () => {
-    const { passed, socket } = await connectTestWs();
+  it("continues connection cleanup when a connection-owned session fails to dispose", async () => {
+    const requestContext = createGatewayWsTestRequestContext();
+    const { logWsControl, passed, socket } = await connectTestWs({
+      options: { buildRequestContext: () => requestContext as never },
+    });
     const handlerParams = passed as {
       connId: string;
       setClient: (client: unknown) => boolean;
     };
+    const dispose = vi.fn(async () => {
+      throw new Error("dispose failed");
+    });
+    requestContext.systemAgentSessions.set("owned-session", {
+      engine: {
+        getPersistentApplySettlement: () => null,
+        dispose,
+      },
+      lastUsedAt: 1,
+      ownerKey: `connection:${handlerParams.connId}`,
+      supportsQrCode: true,
+    } as never);
     expect(
       handlerParams.setClient({
         socket,
@@ -290,6 +305,13 @@ describe("attachGatewayWsConnectionHandler", () => {
       handlerParams.connId,
       expect.objectContaining({ warn: expect.any(Function) }),
     );
+    await vi.waitFor(() => {
+      expect(requestContext.systemAgentSessions.has("owned-session")).toBe(false);
+      expect(dispose).toHaveBeenCalledOnce();
+      expect(logWsControl.warn).toHaveBeenCalledWith(
+        expect.stringContaining("failed to dispose connection-owned system-agent sessions"),
+      );
+    });
   });
 
   it("continues protocol pings after pong and stops when the connection closes", async () => {

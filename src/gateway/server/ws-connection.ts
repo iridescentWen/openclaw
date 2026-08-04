@@ -28,11 +28,11 @@ import {
 } from "../server-constants.js";
 import type { GatewayRequestContext, GatewayRequestHandlers } from "../server-methods/types.js";
 import { formatError } from "../server-utils.js";
-import { cleanupTalkConnection } from "../talk-session-registry.js";
 import { formatForLog, logWs } from "../ws-log.js";
 import { getHealthVersion, incrementPresenceVersion } from "./health-state.js";
 import type { PreauthConnectionBudget } from "./preauth-connection-budget.js";
 import { broadcastPresenceSnapshot } from "./presence-events.js";
+import { cleanupGatewayConnectionResources } from "./ws-connection/gateway-connection-cleanup.js";
 import {
   buildHandshakeAuthLogKey,
   HandshakeAuthLogLimiter,
@@ -563,12 +563,11 @@ export function attachGatewayWsConnectionHandler(params: AttachGatewayWsConnecti
       }
       if (connectionKind === "gateway") {
         const context = buildRequestContext();
-        cleanupTalkConnection(connId, logGateway);
-        context.unsubscribeAllSessionEvents(connId);
-        // Detach (or, with a zero grace period, kill) any PTY shells this
-        // connection owned; detached sessions stay reattachable via
-        // terminal.attach until their reaper fires.
-        context.terminalSessions?.handleDisconnect(connId);
+        cleanupGatewayConnectionResources({
+          context,
+          connId,
+          warn: (message) => logWsControl.warn(message),
+        });
         let currentDisconnectedNodeId: string | null = null;
         if (client?.connect?.role === "node") {
           // Retire I/O immediately, but keep the client revocable until admitted
