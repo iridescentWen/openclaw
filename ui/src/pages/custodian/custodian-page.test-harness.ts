@@ -40,9 +40,16 @@ export function createContext(
     agentsList?: ApplicationContext["agents"]["state"]["agentsList"];
     channelsSnapshot?: ChannelsStatusSnapshot | null;
     gatewayCapabilities?: string[];
+    connectionId?: string;
+    deviceId?: string;
+    deviceToken?: string;
+    processInstanceId?: string;
   } = {},
 ): ContextHarness {
-  const client = { request } as unknown as GatewayBrowserClient;
+  const client = {
+    request,
+    authenticatedDeviceId: options.deviceId ?? null,
+  } as unknown as GatewayBrowserClient;
   let snapshot: ApplicationGatewaySnapshot = {
     client,
     phase: "connected",
@@ -51,13 +58,21 @@ export function createContext(
     hello: {
       type: "hello-ok" as const,
       protocol: 1,
-      auth: { role: "operator", scopes: ["operator.admin"] },
+      auth: {
+        role: "operator",
+        scopes: ["operator.admin"],
+        ...(options.deviceToken ? { deviceToken: options.deviceToken } : {}),
+      },
       features: {
         methods,
         capabilities: options.gatewayCapabilities ?? [
           GATEWAY_SERVER_CAPS.SYSTEM_AGENT_WIZARD_CANCEL,
         ],
       },
+      ...(options.connectionId ? { server: { connId: options.connectionId } } : {}),
+      ...(options.processInstanceId
+        ? { snapshot: { processInstanceId: options.processInstanceId } }
+        : {}),
     },
     assistantAgentId: "main",
     sessionKey: "main",

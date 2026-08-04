@@ -8,24 +8,20 @@ const options = [
   { label: "Twitch", value: "twitch" },
 ];
 
-type TestStepPatch =
-  | { type?: "select"; initialValue?: unknown }
-  | { type: "multiselect"; initialValue?: unknown }
-  | { type: "confirm"; initialValue?: unknown }
-  | { type: "text"; initialValue?: unknown }
-  | { type: "action"; initialValue?: unknown };
+type NonQrWizardStep = Exclude<WizardStep, { type: "qr" }>;
 
-function step(patch: TestStepPatch): WizardStep {
-  switch (patch.type) {
-    case "multiselect":
-      return { id: "step", options, ...patch };
-    case "confirm":
-    case "text":
-    case "action":
-      return { id: "step", ...patch };
-    default:
-      return { id: "step", type: "select", options, ...patch };
-  }
+function step(patch: Partial<NonQrWizardStep>): NonQrWizardStep {
+  return { id: "step", type: "select", options, ...patch };
+}
+
+function qrStep(): WizardStep {
+  return {
+    id: "step",
+    type: "qr",
+    executor: "client",
+    qrDataUrl: "data:image/png;base64,AAAA",
+    expiresInMs: 60_000,
+  };
 }
 
 describe("Custodian rich wizard answers", () => {
@@ -58,6 +54,14 @@ describe("Custodian rich wizard answers", () => {
     expect(custodianWizardSubmission(step({ type: "action" }), undefined)).toEqual({
       answer: { stepId: "step" },
       display: "Continue",
+    });
+    expect(custodianWizardSubmission(qrStep(), undefined)).toEqual({
+      answer: { stepId: "step", value: true },
+      display: "Continue",
+    });
+    expect(custodianWizardSubmission(qrStep(), false)).toEqual({
+      answer: { stepId: "step", value: false },
+      display: "Cancel",
     });
   });
 

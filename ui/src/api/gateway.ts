@@ -309,6 +309,7 @@ async function buildGatewayConnectDevice(params: {
 
 export class GatewayBrowserClient {
   private readonly client: GatewayProtocolClient<ConnectPlan>;
+  private authenticatedDeviceIdValue: string | null = null;
   inboundActivitySeq = 0;
   private lastInboundActivityAtMs: number | null = null;
   private tickWatchTimer: ReturnType<typeof setInterval> | null = null;
@@ -388,6 +389,10 @@ export class GatewayBrowserClient {
 
   get gatewayUrl(): string {
     return this.opts.url;
+  }
+
+  get authenticatedDeviceId(): string | null {
+    return this.authenticatedDeviceIdValue;
   }
 
   start() {
@@ -500,6 +505,7 @@ export class GatewayBrowserClient {
           GATEWAY_CLIENT_CAPS.TOOL_EVENTS,
           GATEWAY_CLIENT_CAPS.INLINE_WIDGETS,
           GATEWAY_CLIENT_CAPS.UI_COMMANDS,
+          GATEWAY_CLIENT_CAPS.SYSTEM_AGENT_QR_CODE,
         ],
         auth: buildGatewayConnectAuth(selectedAuth),
         userAgent: navigator.userAgent,
@@ -516,6 +522,7 @@ export class GatewayBrowserClient {
   }
 
   private handleConnectHello(hello: GatewayHelloOk, plan: ConnectPlan) {
+    this.authenticatedDeviceIdValue = plan.deviceIdentity?.deviceId ?? null;
     this.startTickWatch(hello);
     this.pendingDeviceTokenRetry = false;
     this.deviceTokenRetryBudgetUsed = false;
