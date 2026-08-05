@@ -267,7 +267,8 @@ export function readPluginSdkSurfaceBudgets(env: NodeJS.ProcessEnv = process.env
       // +1: channel-account-bound native approval request selection.
       // +6: required-capability V2 harness contracts through the focused and runtime barrels,
       // including the side-question compatibility split.
-      4863,
+      // +1: canonical PNG QR data URL schema for plugin-owned QR login actions.
+      4864,
       env,
     ),
     publicFunctionExports: readPluginSdkSurfaceBudgetEnv(
