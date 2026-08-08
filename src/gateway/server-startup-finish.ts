@@ -208,6 +208,7 @@ export async function finishGatewayStartup(params: {
       runtimeState,
       sessionCompanion,
       getRuntimeConfig,
+      gatewayTlsFingerprint: gatewayTls.enabled ? gatewayTls.fingerprintSha256 : undefined,
       sessionObserver,
       getMcpAppSandboxPort,
       ensureSandboxHostPort,
