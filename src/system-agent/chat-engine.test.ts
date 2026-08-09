@@ -965,7 +965,12 @@ describe("SystemAgentChatEngine", () => {
     });
     const engine = createQrEngine(async (_channel, prompter, _beforePersistentApply, signal) => {
       const owner = new Promise<void>((_resolve, reject) => {
-        signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+        signal.addEventListener(
+          "abort",
+          () =>
+            reject(signal.reason instanceof Error ? signal.reason : new Error("QR owner aborted")),
+          { once: true },
+        );
       });
       try {
         await prompter.qrCode?.({
