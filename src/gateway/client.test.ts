@@ -745,6 +745,7 @@ describe("GatewayClient close handling", () => {
         phase: "pre-hello",
         socketOpened: false,
         transportValidated: false,
+        connectRequestSent: false,
         transientPreHelloCleanClose: false,
       },
     );
@@ -768,6 +769,7 @@ describe("GatewayClient close handling", () => {
       phase: "pre-hello",
       socketOpened: false,
       transportValidated: false,
+      connectRequestSent: false,
       transientPreHelloCleanClose: false,
     });
     client.stop();
@@ -785,6 +787,7 @@ describe("GatewayClient close handling", () => {
       phase: "pre-hello",
       socketOpened: false,
       transportValidated: false,
+      connectRequestSent: false,
       transientPreHelloCleanClose: false,
     });
     client.stop();
@@ -812,6 +815,7 @@ describe("GatewayClient close handling", () => {
       phase: "pre-hello",
       socketOpened: true,
       transportValidated: false,
+      connectRequestSent: false,
       transientPreHelloCleanClose: false,
     });
     client.stop();
@@ -830,6 +834,7 @@ describe("GatewayClient close handling", () => {
       phase: "pre-hello",
       socketOpened: false,
       transportValidated: false,
+      connectRequestSent: false,
       transientPreHelloCleanClose: false,
     });
     expect(logDebugMock).toHaveBeenCalledWith(
@@ -894,6 +899,7 @@ describe("GatewayClient close handling", () => {
         phase: "pre-hello",
         socketOpened: true,
         transportValidated: true,
+        connectRequestSent: true,
         transientPreHelloCleanClose: true,
       });
 
@@ -980,12 +986,14 @@ describe("GatewayClient close handling", () => {
         phase: "pre-hello",
         socketOpened: true,
         transportValidated: true,
+        connectRequestSent: true,
         transientPreHelloCleanClose: true,
       });
       expect(onClose).toHaveBeenNthCalledWith(2, 1000, "", {
         phase: "pre-hello",
         socketOpened: true,
         transportValidated: true,
+        connectRequestSent: true,
         transientPreHelloCleanClose: true,
       });
       expect(onConnectError).toHaveBeenCalledOnce();
@@ -1105,6 +1113,7 @@ describe("GatewayClient close handling", () => {
       phase: "pre-hello",
       socketOpened: false,
       transportValidated: false,
+      connectRequestSent: false,
       transientPreHelloCleanClose: false,
     });
     client.stop();
@@ -2625,6 +2634,7 @@ describe("GatewayClient connect auth payload", () => {
       phase: "pre-hello",
       socketOpened: true,
       transportValidated: true,
+      connectRequestSent: true,
       transientPreHelloCleanClose: false,
     });
   });

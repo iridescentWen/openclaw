@@ -20,7 +20,7 @@ advances a milestone).
 | 1b  | Naming: devices consolidation                        | landed      | #120689 |
 | 1c  | Cleanup: node-pairing → device-pairing merge         | not started | —       |
 | 2   | `openclaw resume` + web Continue in terminal         | in progress | #120664 |
-| 3   | `oc-pair://` one-paste pairing                       | not started | —       |
+| 3   | `oc-pair://` one-paste pairing                       | in review   | #120768 |
 | 4   | Picker + enrichment + projects read model            | not started | —       |
 | 5   | Device runners                                       | not started | —       |
 | 6   | Stop-and-continue moves                              | not started | —       |
