@@ -1,7 +1,8 @@
 // Node daemon tests cover node daemon command runtime behavior and errors.
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GatewayServiceRuntime } from "../../daemon/service-runtime.js";
 import type { GatewayServiceCommandConfig } from "../../daemon/service-types.js";
+import { mockProcessPlatform } from "../../test-utils/vitest-spies.js";
 import { runNodeDaemonInstall, runNodeDaemonStatus } from "./daemon.js";
 
 const mocks = vi.hoisted(() => {
@@ -109,7 +110,10 @@ vi.mock("../daemon-cli/shared.js", async () => {
 });
 
 describe("runNodeDaemonInstall", () => {
+  let platformMock: ReturnType<typeof mockProcessPlatform>;
+
   beforeEach(() => {
+    platformMock = mockProcessPlatform("linux");
     mocks.runtime.log.mockClear();
     mocks.runtime.error.mockClear();
     mocks.runtime.writeJson.mockClear();
@@ -136,6 +140,10 @@ describe("runNodeDaemonInstall", () => {
       user: "pi",
       linger: "no",
     });
+  });
+
+  afterEach(() => {
+    platformMock.mockRestore();
   });
 
   it.each([
