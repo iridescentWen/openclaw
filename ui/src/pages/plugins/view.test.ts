@@ -65,6 +65,7 @@ function createProps(overrides: Partial<PluginsViewProps> = {}): PluginsViewProp
     onShowDetails: () => undefined,
     onSetEnabled: () => undefined,
     onInstall: () => undefined,
+    onDismissMessage: () => undefined,
     onRequestUninstall: () => undefined,
     onCancelUninstall: () => undefined,
     onUninstall: () => undefined,
@@ -656,6 +657,90 @@ describe("renderPlugins", () => {
       packageName,
       version: "2.0.0",
       acknowledgeClawHubRisk: true,
+    });
+  });
+
+  it("renders install policy findings with cancel and acknowledged retry actions", () => {
+    const plugin = createPlugin({
+      id: "kitchen-sink",
+      name: "OpenClaw Kitchen Sink",
+      installed: false,
+      enabled: false,
+      state: "disabled",
+      install: { source: "official", pluginId: "kitchen-sink" },
+    });
+    const key = pluginRowKey(plugin.id);
+    const onInstall = vi.fn();
+    const onDismissMessage = vi.fn();
+    const onShowDetails = vi.fn();
+    const request = { source: "official" as const, pluginId: "kitchen-sink" };
+    const container = mount(
+      createProps({
+        activeTab: "discover",
+        result: createResult([plugin]),
+        messages: {
+          [key]: {
+            kind: "warning",
+            text: "ClawScan found issues to review.",
+            installPolicyWarning: {
+              request,
+              details: {
+                installPolicyCode: "install_policy_warning_acknowledgement_required",
+                targetName: "openclaw-kitchen-sink-fixture",
+                targetType: "plugin",
+                requestMode: "install",
+                reason: "ClawScan found issues to review.",
+                findings: [
+                  {
+                    ruleId: "semgrep-finding",
+                    severity: "warn",
+                    message: "Semgrep found a risky command.",
+                    file: "index.ts",
+                    line: 12,
+                  },
+                ],
+              },
+            },
+          },
+        },
+        onInstall,
+        onDismissMessage,
+        onShowDetails,
+      }),
+    );
+
+    const row = expectDefined(
+      container.querySelector<HTMLElement>('[data-plugin-id="kitchen-sink"]'),
+      "kitchen sink plugin row",
+    );
+    const alert = expectDefined(row.querySelector('[role="alert"]'), "install policy warning");
+    expect(normalizedText(alert)).toContain("Security review needed");
+    expect(normalizedText(alert)).toContain("Your install policy found 1 warning");
+    expect(normalizedText(alert)).toContain("This plugin has not been installed");
+    expect(normalizedText(alert)).toContain("Policy findings");
+    expect(normalizedText(alert)).toContain("Semgrep found a risky command.");
+    const technicalDetails = expectDefined(
+      alert.querySelector<HTMLDetailsElement>(".plugins-policy-review__details"),
+      "install policy scan details",
+    );
+    expect(technicalDetails.open).toBe(false);
+    expect(normalizedText(technicalDetails.querySelector("summary"))).toBe("Scan details");
+    expect(
+      technicalDetails?.querySelector(".plugins-policy-review__details-chevron svg"),
+    ).not.toBeNull();
+    expect(normalizedText(technicalDetails)).toContain("semgrep-finding");
+    expect(normalizedText(technicalDetails)).toContain("index.ts:12");
+    technicalDetails.querySelector("summary")?.click();
+    expect(technicalDetails.open).toBe(true);
+    expect(onShowDetails).not.toHaveBeenCalled();
+
+    actionButton(alert, "Cancel")?.click();
+    expect(onDismissMessage).toHaveBeenCalledWith(key);
+
+    actionButton(alert, "Install anyway")?.click();
+    expect(onInstall).toHaveBeenCalledWith(key, {
+      ...request,
+      acknowledgeInstallPolicyWarning: true,
     });
   });
 

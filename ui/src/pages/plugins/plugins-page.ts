@@ -51,6 +51,7 @@ import {
 import { OpenClawLightDomElement } from "../../lit/openclaw-element.ts";
 import { SubscriptionsController } from "../../lit/subscriptions-controller.ts";
 import { fetchPluginIconBlobUrl } from "./icon-loader.ts";
+import { readPluginInstallPolicyWarning } from "./install-policy-warning.ts";
 import { PLUGINS_HUB_PANEL_ID, pluginsHubTabs, type PluginsHubTab } from "./plugins-hub.ts";
 import type { ConnectorSuggestion } from "./presentation.ts";
 import { pluginArtPath } from "./presentation.ts";
@@ -782,6 +783,15 @@ class PluginsPage extends OpenClawLightDomElement {
         await this.refreshCatalogAfterMutation(client);
       },
       (error) => {
+        const policyWarning = readPluginInstallPolicyWarning(error);
+        if (policyWarning) {
+          this.setMessage(rowKey, {
+            kind: "warning",
+            text: policyWarning.reason,
+            installPolicyWarning: { details: policyWarning, request },
+          });
+          return;
+        }
         const trust = readPluginInstallTrustError(error);
         const packageName = request.source === "clawhub" ? request.packageName : null;
         if (packageName && pluginInstallNeedsRiskAcknowledgement(error)) {
@@ -1030,6 +1040,7 @@ class PluginsPage extends OpenClawLightDomElement {
           onSetEnabled: (pluginId, enabled, rowKey) =>
             void this.updateEnabled(pluginId, enabled, rowKey),
           onInstall: (rowKey, request) => void this.install(rowKey, request),
+          onDismissMessage: (rowKey) => this.setMessage(rowKey, null),
           onRequestUninstall: (rowKey) => this.setPendingRemoval(rowKey, true),
           onCancelUninstall: (rowKey) => this.setPendingRemoval(rowKey, false),
           onUninstall: (pluginId, rowKey) => void this.uninstall(pluginId, rowKey),

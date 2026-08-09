@@ -150,6 +150,23 @@ const installResult = {
   restartRequired: true,
 } satisfies PluginMutationResult;
 
+const installPolicyWarning = {
+  installPolicyCode: "install_policy_warning_acknowledgement_required",
+  targetName: "@openclaw/lobster",
+  targetType: "plugin",
+  requestMode: "install",
+  reason: "ClawScan found issues to review.",
+  findings: [
+    {
+      ruleId: "semgrep-finding",
+      severity: "warn",
+      message: "Semgrep found a risky command.",
+      file: "index.ts",
+      line: 12,
+    },
+  ],
+};
+
 const enableWorkboardResult = {
   ok: true,
   plugin: workboardEnabled,
@@ -638,6 +655,71 @@ describeControlUiE2e("Control UI Plugins mocked Gateway E2E", () => {
           path: path.join(artifactDir, "07-workboard-sidebar.png"),
         });
       }
+    } finally {
+      await context.close();
+    }
+  });
+
+  it("reviews an install policy warning before sending an acknowledged retry", async () => {
+    const context = await newContext();
+    const page = await context.newPage();
+    const gateway = await installMockGateway(page, {
+      featureMethods: pluginMethods,
+      methodResponses: pluginMethodResponses(),
+    });
+
+    try {
+      await page.goto(`${server.baseUrl}settings/plugins`);
+      await page.getByRole("tab", { name: /^Discover/u }).click();
+      const row = page.locator('[data-plugin-id="lobster"]');
+      await row.waitFor({ state: "visible" });
+
+      await gateway.deferNext("plugins.install");
+      await row.getByRole("button", { name: "Install Lobster", exact: true }).click();
+      expect(requestParams(await gateway.waitForRequest("plugins.install"))).toEqual({
+        source: "clawhub",
+        packageName: "@openclaw/lobster",
+      });
+      await gateway.rejectDeferred("plugins.install", {
+        code: "INVALID_REQUEST",
+        message: "raw terminal install-policy output",
+        details: installPolicyWarning,
+      });
+
+      const review = row.getByRole("alert");
+      await review.waitFor({ state: "visible" });
+      expect(await review.textContent()).toContain("Security review needed");
+      expect(await review.textContent()).toContain("Your install policy found 1 warning");
+      expect(await review.textContent()).toContain("This plugin has not been installed");
+      expect(await review.textContent()).toContain("Semgrep found a risky command.");
+      expect(await review.textContent()).not.toContain("raw terminal install-policy output");
+      await captureScreenshot(page, "09-policy-review-desktop.png");
+
+      const installCountBeforeCancel = (await gateway.getRequests("plugins.install")).length;
+      await review.getByRole("button", { name: "Cancel", exact: true }).click();
+      await review.waitFor({ state: "detached" });
+      expect((await gateway.getRequests("plugins.install")).length).toBe(installCountBeforeCancel);
+
+      const installCountBeforeSecondAttempt = (await gateway.getRequests("plugins.install")).length;
+      await gateway.deferNext("plugins.install");
+      await row.getByRole("button", { name: "Install Lobster", exact: true }).click();
+      await waitForNextRequest(gateway, "plugins.install", installCountBeforeSecondAttempt);
+      await gateway.rejectDeferred("plugins.install", {
+        code: "INVALID_REQUEST",
+        message: "raw terminal install-policy output",
+        details: installPolicyWarning,
+      });
+      await review.waitFor({ state: "visible" });
+
+      const installCountBeforeRetry = (await gateway.getRequests("plugins.install")).length;
+      await gateway.deferNext("plugins.install");
+      await review.getByRole("button", { name: "Install anyway", exact: true }).click();
+      const retry = await waitForNextRequest(gateway, "plugins.install", installCountBeforeRetry);
+      expect(requestParams(retry)).toEqual({
+        source: "clawhub",
+        packageName: "@openclaw/lobster",
+        acknowledgeInstallPolicyWarning: true,
+      });
     } finally {
       await context.close();
     }

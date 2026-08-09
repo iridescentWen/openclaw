@@ -28,6 +28,7 @@ import {
   type PluginListResult,
   type PluginSearchResult,
 } from "../../lib/plugins/index.ts";
+import type { PluginInstallPolicyWarningDetails } from "./install-policy-warning.ts";
 import {
   CONNECTOR_GROUP_ORDER,
   CONNECTOR_SUGGESTIONS,
@@ -45,9 +46,13 @@ export type PluginsTab = "installed" | "discover";
 export type InstalledFilter = "all" | "enabled" | "disabled" | "issues";
 
 export type PluginRowMessage = {
-  kind: "success" | "error";
+  kind: "success" | "error" | "warning";
   text: string;
   acknowledge?: { packageName: string; version?: string };
+  installPolicyWarning?: {
+    details: PluginInstallPolicyWarningDetails;
+    request: PluginInstallRequest;
+  };
 };
 
 type PluginsViewProps = {
@@ -81,6 +86,7 @@ type PluginsViewProps = {
   onShowDetails: (pluginId: string | null) => void;
   onSetEnabled: (pluginId: string, enabled: boolean, rowKey: string) => void;
   onInstall: (rowKey: string, request: PluginInstallRequest) => void;
+  onDismissMessage: (rowKey: string) => void;
   onRequestUninstall: (rowKey: string) => void;
   onCancelUninstall: (rowKey: string) => void;
   onUninstall: (pluginId: string, rowKey: string) => void;
@@ -378,6 +384,134 @@ function renderRowMessage(
   if (!message) {
     return nothing;
   }
+  if (message.installPolicyWarning) {
+    const { details, request } = message.installPolicyWarning;
+    const findings = details.findings ?? [];
+    const reviewBody =
+      findings.length === 0
+        ? t("pluginsPage.policyReviewBodyUnknown")
+        : findings.length === 1
+          ? t("pluginsPage.policyReviewBodyOne")
+          : t("pluginsPage.policyReviewBodyMany", { count: String(findings.length) });
+    return html`
+      <div class="plugins-row-message plugins-row-message--warning" role="alert">
+        <div class="plugins-policy-review__header">
+          <span class="plugins-policy-review__icon" aria-hidden="true">
+            ${icons.alertTriangle}
+          </span>
+          <div>
+            <strong>${t("pluginsPage.policyReviewTitle")}</strong>
+            <span>${reviewBody}</span>
+          </div>
+        </div>
+        ${findings.length > 0
+          ? html`
+              <section class="plugins-policy-review__findings-panel">
+                <div class="plugins-policy-review__findings-heading">
+                  <span>${t("pluginsPage.policyReviewFindings")}</span>
+                  <span class="plugins-policy-review__count"
+                    >${t("pluginsPage.policyReviewFindingCount", {
+                      count: String(findings.length),
+                    })}</span
+                  >
+                </div>
+                <ul class="plugins-policy-review__findings">
+                  ${findings.map(
+                    (finding) => html`
+                      <li>
+                        <span class="plugins-policy-review__finding-mark" aria-hidden="true"></span>
+                        <span>${finding.message}</span>
+                      </li>
+                    `,
+                  )}
+                </ul>
+              </section>
+            `
+          : html`
+              <section class="plugins-policy-review__findings-panel">
+                <span class="plugins-policy-review__findings-heading"
+                  >${t("pluginsPage.policyReviewReason")}</span
+                >
+                <p class="plugins-policy-review__reason">${details.reason}</p>
+              </section>
+            `}
+        ${findings.length > 0
+          ? html`
+              <details class="plugins-policy-review__details">
+                <summary>
+                  <span class="plugins-policy-review__details-chevron" aria-hidden="true"
+                    >${icons.chevronRight}</span
+                  >
+                  <span>${t("pluginsPage.policyReviewTechnicalDetails")}</span>
+                </summary>
+                <dl>
+                  <div>
+                    <dt>${t("pluginsPage.policyReviewPolicyResponse")}</dt>
+                    <dd>${details.reason}</dd>
+                  </div>
+                  ${findings.map(
+                    (finding, index) => html`
+                      <div>
+                        <dt>${t("pluginsPage.policyReviewRule", { count: String(index + 1) })}</dt>
+                        <dd><code>${finding.ruleId}</code></dd>
+                      </div>
+                      ${finding.file
+                        ? html`
+                            <div>
+                              <dt>${t("pluginsPage.policyReviewLocation")}</dt>
+                              <dd>
+                                <code
+                                  >${finding.file}${finding.line ? `:${finding.line}` : ""}</code
+                                >
+                              </dd>
+                            </div>
+                          `
+                        : nothing}
+                      ${finding.evidence
+                        ? html`
+                            <div>
+                              <dt>${t("pluginsPage.policyReviewEvidence")}</dt>
+                              <dd>${finding.evidence}</dd>
+                            </div>
+                          `
+                        : nothing}
+                    `,
+                  )}
+                </dl>
+              </details>
+            `
+          : nothing}
+        <div class="plugins-policy-review__footer">
+          <span class="plugins-policy-review__guidance"
+            >${t("pluginsPage.policyReviewGuidance")}</span
+          >
+          <div class="plugins-policy-review__actions">
+            <button
+              type="button"
+              class="btn btn--sm"
+              ?disabled=${busy}
+              @click=${() => props.onDismissMessage(key)}
+            >
+              ${t("pluginsPage.cancel")}
+            </button>
+            <button
+              type="button"
+              class="btn btn--sm danger"
+              title=${props.mutationBlockedReason ?? ""}
+              ?disabled=${busy || !props.canMutate}
+              @click=${() =>
+                props.onInstall(key, {
+                  ...request,
+                  acknowledgeInstallPolicyWarning: true,
+                })}
+            >
+              ${busy ? t("pluginsPage.installing") : t("pluginsPage.installAnyway")}
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
   const role = message.kind === "error" ? "alert" : "status";
   return html`
     <div class="plugins-row-message plugins-row-message--${message.kind}" role=${role}>
@@ -408,7 +542,9 @@ function renderRowMessage(
 /** Ignore activations bubbling from interactive children so rows stay clickable. */
 function fromInteractiveChild(event: Event): boolean {
   return Boolean(
-    (event.target as HTMLElement | null)?.closest("button, a, input, label, form, [role='menu']"),
+    (event.target as HTMLElement | null)?.closest(
+      "button, a, input, label, form, summary, [role='menu']",
+    ),
   );
 }
 
