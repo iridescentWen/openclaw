@@ -141,6 +141,8 @@ type SystemAgentChatReply = {
   sensitive?: boolean;
   /** The hosted wizard will consume the next message as its current step answer. */
   wizardInputPending?: boolean;
+  /** The hosted wizard is awaiting external completion without an answerable step. */
+  wizardSettling?: boolean;
   /** Present when the host must leave chat for an interactive handoff. */
   handoff?: SystemAgentOperation;
   /** Structured choice mirroring the awaited wizard step for card-capable clients. */
@@ -942,7 +944,11 @@ export class SystemAgentChatEngine {
       { text, action: "none" },
       step ? formatStructuredWizardAnswerForHistory(step, answer.value) : "Continue",
     );
-    if ((step?.type === "qr" || staleQrAcknowledgement) && !completedReply.wizardInputPending) {
+    if (
+      (step?.type === "qr" || staleQrAcknowledgement) &&
+      !completedReply.wizardInputPending &&
+      !completedReply.wizardSettling
+    ) {
       this.retainedQrTerminalReply = { stepId: answer.stepId, reply: { ...completedReply } };
     }
     return completedReply;
@@ -998,10 +1004,14 @@ export class SystemAgentChatEngine {
             : undefined,
         )
       : null;
+    const wizardInputPending = step ? wizardStepAwaitsInput(step) : false;
+    const wizardSettling =
+      bridge !== null && !step && bridge.session.hasExternalQrPresentationOwner();
     return {
       ...projected,
       ...(step?.sensitive === true ? { sensitive: true } : {}),
-      ...(bridge ? { wizardInputPending: true } : {}),
+      ...(wizardInputPending ? { wizardInputPending: true } : {}),
+      ...(wizardSettling ? { wizardSettling: true } : {}),
       ...(question ? { question } : {}),
       ...(clientStep ? { step: clientStep } : {}),
     };
