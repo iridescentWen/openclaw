@@ -337,7 +337,7 @@ export const zalouserSetupWizard: ChannelSetupWizard = {
               qrPath
                 ? t("wizard.zalouser.qrImageSaved", { path: qrPath })
                 : t("wizard.zalouser.qrImageWriteFailed"),
-              t("wizard.zalouser.scanApproveContinue"),
+              ...(qrPath ? [t("wizard.zalouser.scanApproveContinue")] : []),
             ].join("\n"),
             t("wizard.zalouser.qrLoginTitle"),
           );
@@ -386,7 +386,7 @@ export const zalouserSetupWizard: ChannelSetupWizard = {
               qrPath
                 ? t("wizard.zalouser.qrImageSaved", { path: qrPath })
                 : t("wizard.zalouser.qrImageWriteFailed"),
-              t("wizard.zalouser.scanApproveContinue"),
+              ...(qrPath ? [t("wizard.zalouser.scanApproveContinue")] : []),
             ].join("\n"),
             t("wizard.zalouser.qrLoginTitle"),
           );

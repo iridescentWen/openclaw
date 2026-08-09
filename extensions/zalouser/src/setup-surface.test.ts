@@ -231,6 +231,10 @@ describe("zalouser setup wizard", () => {
       expect.stringContaining("Could not write QR image file"),
       "QR Login",
     );
+    expect(note).not.toHaveBeenCalledWith(
+      expect.stringContaining("Scan + approve on phone, then continue."),
+      "QR Login",
+    );
     expect(confirmations).not.toContain("Did you scan and approve the QR on your phone?");
     expect(waitForZaloQrLoginMock).not.toHaveBeenCalled();
   });
