@@ -620,9 +620,6 @@ export const systemAgentHandlers: GatewayRequestHandlers = {
             return;
           }
           assertSystemAgentGatewayExecutionActive(sessions, ownerKey);
-          if (params.reset) {
-            appendTranscriptReset();
-          }
           persistEngineHistory(engine, welcomeHistoryStart);
           session = {
             engine,
