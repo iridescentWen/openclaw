@@ -1,5 +1,4 @@
 // Executes validated plugin, marketplace, ClawHub, and hook-pack install requests.
-import { theme } from "../../packages/terminal-core/src/theme.js";
 import { assertConfigWriteAllowedInCurrentMode } from "../config/config.js";
 import { reportClawHubPluginInstallTelemetry } from "../infra/clawhub-packages.js";
 import { parseClawHubPluginSpec } from "../infra/clawhub-spec.js";
@@ -16,6 +15,7 @@ import { markClawPackageIndependentlyOwned } from "../state/claw-package-adoptio
 import { withClawPackageLifecycleLease } from "../state/claw-package-lifecycle-lease.js";
 import { shortenHomePath } from "../utils.js";
 import { resolveClawHubRiskAcknowledgementCliOptions } from "./clawhub-risk-acknowledgement.js";
+import { resolveInstallPolicyWarningAcknowledgementCliOptions } from "./install-policy-warning-acknowledgement.js";
 import {
   confirmNonClawHubInstall,
   type NonClawHubInstallSourceClass,
@@ -40,9 +40,6 @@ import {
   type PluginInstallPreflight,
   type RunPluginInstallCommandParams,
 } from "./plugins-install-preflight.js";
-
-const DEPRECATED_DANGEROUS_FORCE_UNSAFE_INSTALL_WARNING =
-  "--dangerously-force-unsafe-install is deprecated and no longer affects plugin installs because built-in install-time dangerous-code scanning has been removed. Configure security.installPolicy for operator-owned install decisions.";
 
 function isClawHubBlockedCliFailure(result: { code?: string; warning?: string }): boolean {
   return (
@@ -76,10 +73,6 @@ async function runPluginInstallCommandUnlocked(
   const runtime = params.runtime ?? defaultRuntime;
   const invalidateRuntimeCache = params.invalidateRuntimeCache ?? true;
   const { raw, opts, installMode, request } = preflight;
-  if (opts.dangerouslyForceUnsafeInstall) {
-    runtime.log(theme.warn(DEPRECATED_DANGEROUS_FORCE_UNSAFE_INSTALL_WARNING));
-  }
-
   const snapshot = await loadConfigForInstall(request).catch((error: unknown) => {
     runtime.error(formatErrorMessage(error));
     return null;
@@ -87,7 +80,13 @@ async function runPluginInstallCommandUnlocked(
   if (!snapshot) {
     return runtime.exit(1);
   }
-  const safetyOverrides = resolveInstallSafetyOverrides({ ...opts, config: snapshot.config });
+  const safetyOverrides = resolveInstallSafetyOverrides({
+    ...opts,
+    config: snapshot.config,
+    ...resolveInstallPolicyWarningAcknowledgementCliOptions({
+      dangerouslyForceUnsafeInstall: opts.dangerouslyForceUnsafeInstall,
+    }),
+  });
   const acknowledgeNonClawHubSource = async (
     sourceClass: NonClawHubInstallSourceClass,
     spec: string,

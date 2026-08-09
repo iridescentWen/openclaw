@@ -77,6 +77,21 @@ describe("collectInstallPolicyHealthLines", () => {
     expect(lines.join("\n")).toContain("Deep probe allowed the synthetic install request");
   });
 
+  it("reports warnings as requiring acknowledgement", async () => {
+    const dir = tempDirs.make("openclaw-doctor-install-policy-");
+    const scriptPath = await writePolicyScript(
+      dir,
+      JSON.stringify({ protocolVersion: 1, decision: "warn", reason: "review probe" }),
+    );
+
+    const lines = await collectInstallPolicyHealthLines(configWithPolicy(scriptPath), {
+      deep: true,
+    });
+
+    expect(lines.join("\n")).toContain("Deep probe returned a warning: review probe");
+    expect(lines.join("\n")).toContain("require explicit acknowledgement");
+  });
+
   it("reports unavailable enabled policy as fail-closed", async () => {
     const lines = await collectInstallPolicyHealthLines({
       security: {
