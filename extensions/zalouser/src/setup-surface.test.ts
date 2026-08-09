@@ -16,6 +16,7 @@ import {
   resolveZaloAllowFromEntriesMock,
   resolveZaloGroupsByEntriesMock,
   startZaloQrLoginMock,
+  waitForZaloQrLoginMock,
 } from "./zalo-js.test-mocks.js";
 
 const zalouserConfigure = createPluginSetupWizardConfigure(zalouserSetupPlugin);
@@ -202,6 +203,28 @@ describe("zalouser setup wizard", () => {
     expect(logoutZaloProfileMock.mock.invocationCallOrder[0]).toBeLessThan(
       beforePersistentEffect.mock.invocationCallOrder[1]!,
     );
+  });
+
+  it("does not wait after forced re-login rejects the QR image", async () => {
+    checkZaloAuthenticatedMock.mockResolvedValueOnce(true);
+    startZaloQrLoginMock.mockResolvedValueOnce({
+      message: "qr pending",
+      qrDataUrl: "data:text/plain;base64,bm90LWEtcG5n",
+    });
+    waitForZaloQrLoginMock.mockClear();
+    const note = vi.fn(async (_message: string, _title?: string) => {});
+    const prompter = createTestWizardPrompter({
+      note,
+      confirm: vi.fn(async () => false),
+    });
+
+    await runSetup({ prompter });
+
+    expect(note).toHaveBeenCalledWith(
+      expect.stringContaining("Could not write QR image file"),
+      "QR Login",
+    );
+    expect(waitForZaloQrLoginMock).not.toHaveBeenCalled();
   });
 
   it("prompts DM policy before group access in quickstart", async () => {

@@ -381,17 +381,27 @@ export const zalouserSetupWizard: ChannelSetupWizard = {
           await prompter.note(
             [
               start.message,
-              qrPath ? t("wizard.zalouser.qrImageSaved", { path: qrPath }) : undefined,
-            ]
-              .filter(Boolean)
-              .join("\n"),
+              qrPath
+                ? t("wizard.zalouser.qrImageSaved", { path: qrPath })
+                : t("wizard.zalouser.qrImageWriteFailed"),
+              t("wizard.zalouser.scanApproveContinue"),
+            ].join("\n"),
             t("wizard.zalouser.qrLoginTitle"),
           );
-          const waited = await waitForZaloQrLogin({ profile: account.profile, timeoutMs: 120_000 });
-          await prompter.note(
-            waited.message,
-            waited.connected ? t("common.done") : t("wizard.zalouser.loginPendingTitle"),
-          );
+          const scanned = await prompter.confirm({
+            message: t("wizard.zalouser.qrScannedPrompt"),
+            initialValue: true,
+          });
+          if (scanned) {
+            const waited = await waitForZaloQrLogin({
+              profile: account.profile,
+              timeoutMs: 120_000,
+            });
+            await prompter.note(
+              waited.message,
+              waited.connected ? t("common.done") : t("wizard.zalouser.loginPendingTitle"),
+            );
+          }
         }
       }
     }
