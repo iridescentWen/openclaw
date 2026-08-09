@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createDeferred } from "../../test-utils/deferred.js";
+import { createDeferred } from "../../shared/deferred.js";
 import { WizardSession } from "../../wizard/session.js";
 import {
   assertSystemAgentGatewayExecutionActive,

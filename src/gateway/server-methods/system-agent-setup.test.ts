@@ -6,13 +6,13 @@ import { getCommandLaneSnapshot } from "../../process/command-queue.js";
 import { resetCommandQueueStateForTest } from "../../process/command-queue.test-support.js";
 import { CommandLane } from "../../process/lanes.js";
 import { defaultRuntime } from "../../runtime.js";
+import { createDeferred } from "../../shared/deferred.js";
 import {
   createSystemAgentVerifiedInferenceTestFixture,
   installSystemAgentPluginMetadataTestSnapshot,
   type SystemAgentPluginMetadataTestSnapshot,
 } from "../../system-agent/system-agent.test-helpers.js";
 import type { SystemAgentVerifiedInferenceBinding } from "../../system-agent/verified-inference.js";
-import { createDeferred } from "../../test-utils/deferred.js";
 import {
   runExclusiveSystemAgentSetupActivation,
   whenAdmittedWizardSessionSettled,
