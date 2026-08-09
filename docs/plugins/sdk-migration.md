@@ -638,6 +638,11 @@ timeline for current status.
     declare what they render (cards, buttons, selects) rather than which raw
     action names they accept.
 
+    `QrPngDataUrlSchema` remains available from this subpath for channel setup
+    and login tools that return QR images through the Gateway. It validates the
+    canonical, bounded PNG data URL produced by OpenClaw QR renderers; it is not
+    a native message-action schema.
+
   </Accordion>
 
   <Accordion title="Web search provider tool() helper -> createTool() on the plugin">

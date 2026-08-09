@@ -3,9 +3,6 @@ import { Compile } from "typebox/compile";
 import { describe, expect, it } from "vitest";
 import { ChannelsStatusResultSchema, WebLoginWaitParamsSchema } from "./schema/channels.js";
 
-const PNG_DATA_URL =
-  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
-
 /**
  * Channel schema regressions for browser login and status diagnostics.
  * These payloads are consumed by dashboard/operator UI, so QR payload bounds
@@ -19,7 +16,7 @@ describe("WebLoginWaitParamsSchema", () => {
   it("bounds caller-provided QR data URLs", () => {
     expect(
       validate.Check({
-        currentQrDataUrl: PNG_DATA_URL,
+        currentQrDataUrl: "data:image/png;base64,qr",
       }),
     ).toBe(true);
 
@@ -33,26 +30,14 @@ describe("WebLoginWaitParamsSchema", () => {
         currentQrDataUrl: "https://example.com/qr.png",
       }),
     ).toBe(false);
-    expect(
-      validate.Check({
-        currentQrDataUrl: "data:image/png;base64,not-base64!",
-      }),
-    ).toBe(false);
-    expect(
-      validate.Check({
-        currentQrDataUrl: "data:image/png;base64,SGVsbG8=",
-      }),
-    ).toBe(false);
+  });
+
+  it("preserves prefix-valid QR values accepted from existing web-login clients", () => {
     expect(
       validate.Check({
         currentQrDataUrl: "data:image/png;base64,iVBORw0KGgp=",
       }),
-    ).toBe(false);
-    expect(
-      validate.Check({
-        currentQrDataUrl: PNG_DATA_URL.slice(0, -1),
-      }),
-    ).toBe(false);
+    ).toBe(true);
   });
 });
 

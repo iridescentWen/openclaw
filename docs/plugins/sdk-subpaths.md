@@ -126,7 +126,7 @@ deprecated for new code; see the per-row notes below.
     | `plugin-sdk/channel-streaming` | Deprecated compatibility facade. Use `plugin-sdk/channel-outbound`. |
     | `plugin-sdk/channel-streaming-config` | Dependency-light channel streaming config readers (`getChannelStreamingConfigObject`, `resolveChannelStreamingNativeTransport`) for doctor contract closures and other control-plane paths that must not load the reply pipeline |
     | `plugin-sdk/channel-send-result` | Reply result types |
-    | `plugin-sdk/channel-actions` | Channel message-action helpers, plus deprecated native schema helpers kept for plugin compatibility |
+    | `plugin-sdk/channel-actions` | Channel message-action helpers and `QrPngDataUrlSchema`, the bounded canonical PNG data-URL schema for plugin setup/login QR payloads |
     | `plugin-sdk/channel-route` | Private-local after July 2026; Shared route normalization, parser-driven target resolution, thread-id stringification, dedupe/compact route keys, parsed-target types, and route/target comparison helpers |
     | `plugin-sdk/channel-targets` | Private-local after July 2026; Target parsing helpers; route comparison callers should use `plugin-sdk/channel-route` |
     | `plugin-sdk/channel-contract` | Channel contract types |
