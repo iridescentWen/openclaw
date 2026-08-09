@@ -5,7 +5,6 @@ import {
   type SystemAgentChatResult,
 } from "@openclaw/gateway-protocol";
 import type { GatewayBrowserClient } from "../../api/gateway.ts";
-import { selectApplicationSession } from "../../app/agent-selection.ts";
 import type { ApplicationContext } from "../../app/context.ts";
 import { t } from "../../i18n/index.ts";
 import {
@@ -13,8 +12,7 @@ import {
   isGatewayCapabilityAdvertised,
   isGatewayMethodAdvertised,
 } from "../../lib/gateway-methods.ts";
-import { buildAgentMainSessionKey } from "../../lib/sessions/session-key.ts";
-import { pathForCustodianAgentHandoff } from "./custodian-navigation.ts";
+import { applyCustodianChatNavigation } from "./custodian-navigation.ts";
 import {
   CustodianQrScheduler,
   custodianWizardSubmission,
@@ -743,34 +741,13 @@ export class CustodianSessionStore {
       if (step?.type === "qr") {
         this.qrScheduler.scheduleStep(client, step);
       }
-      if (result.action === "open-agent") {
-        let sessionKey = context.gateway.snapshot.sessionKey?.trim();
-        if (result.agentId) {
-          const roster = await context.agents.refreshList();
-          if (epoch !== this.requestEpoch || client !== this.activeClient) {
-            return "sent";
-          }
-          sessionKey = buildAgentMainSessionKey({
-            agentId: result.agentId,
-            mainKey: roster?.mainKey,
-          });
-          selectApplicationSession({
-            selection: context.agentSelection,
-            gateway: context.gateway,
-            sessionKey,
-            agentId: result.agentId,
-          });
-        }
-        if (result.agentDraft === "hatch" && sessionKey) {
-          context.navigate("chat", {
-            pathname: pathForCustodianAgentHandoff(context, sessionKey),
-            search: `?draft=${encodeURIComponent(t("custodian.hatchDraft"))}`,
-          });
-        } else {
-          this.exitSetup();
-        }
-      } else if (result.action === "exit") {
-        this.exitSetup();
+      const navigationCurrent = await applyCustodianChatNavigation({
+        context,
+        result,
+        isCurrent: () => epoch === this.requestEpoch && client === this.activeClient,
+      });
+      if (!navigationCurrent) {
+        return "sent";
       }
       return "sent";
     } catch (error) {
