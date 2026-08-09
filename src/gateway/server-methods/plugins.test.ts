@@ -2,6 +2,7 @@
 
 import { expectDefined } from "@openclaw/normalization-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { InstallPolicyWarningDetails } from "../../plugins/install-security-scan.types.js";
 
 const managementMocks = vi.hoisted(() => {
   class ManagedPluginLifecycleError extends Error {
@@ -9,6 +10,7 @@ const managementMocks = vi.hoisted(() => {
     readonly code?: string;
     readonly version?: string;
     readonly warning?: string;
+    readonly installPolicyWarning?: InstallPolicyWarningDetails;
 
     constructor(
       message: string,
@@ -17,6 +19,7 @@ const managementMocks = vi.hoisted(() => {
         code?: string;
         version?: string;
         warning?: string;
+        installPolicyWarning?: InstallPolicyWarningDetails;
       },
     ) {
       super(message);
@@ -24,6 +27,7 @@ const managementMocks = vi.hoisted(() => {
       this.code = details?.code;
       this.version = details?.version;
       this.warning = details?.warning;
+      this.installPolicyWarning = details?.installPolicyWarning;
     }
   }
   return {
@@ -300,6 +304,26 @@ describe("plugin management Gateway handlers", () => {
     });
   });
 
+  it("forwards explicit install-policy warning acknowledgement", async () => {
+    managementMocks.install.mockResolvedValue({
+      plugin: { ...workboard, id: "diffs", name: "Diffs", enabled: true, state: "enabled" },
+    });
+
+    await callHandler("plugins.install", {
+      source: "official",
+      pluginId: "diffs",
+      acknowledgeInstallPolicyWarning: true,
+    });
+
+    expect(managementMocks.install).toHaveBeenCalledWith({
+      request: {
+        source: "official",
+        pluginId: "diffs",
+        acknowledgeInstallPolicyWarning: true,
+      },
+    });
+  });
+
   it("returns structured ClawHub acknowledgement details", async () => {
     managementMocks.install.mockRejectedValue(
       new managementMocks.ManagedPluginLifecycleError("Review required", {
@@ -323,6 +347,54 @@ describe("plugin management Gateway handlers", () => {
         clawhubTrustCode: "clawhub_risk_acknowledgement_required",
         version: "1.2.3",
         warning: "Suspicious release",
+      },
+    });
+  });
+
+  it("returns structured install-policy warning details", async () => {
+    managementMocks.install.mockRejectedValue(
+      new managementMocks.ManagedPluginLifecycleError("Install requires approval", {
+        installPolicyWarning: {
+          targetName: "demo-plugin",
+          targetType: "plugin",
+          requestMode: "install",
+          reason: "Scanner found behavior that needs review",
+          findings: [
+            {
+              ruleId: "dynamic-eval",
+              severity: "warn",
+              message: "Dynamic code execution",
+              file: "index.js",
+              line: 12,
+            },
+          ],
+        },
+      }),
+    );
+
+    const result = await callHandler("plugins.install", {
+      source: "clawhub",
+      packageName: "community/plugin",
+    });
+
+    expect(result.error).toMatchObject({
+      code: "INVALID_REQUEST",
+      message: "Install requires approval",
+      details: {
+        installPolicyCode: "install_policy_warning_acknowledgement_required",
+        targetName: "demo-plugin",
+        targetType: "plugin",
+        requestMode: "install",
+        reason: "Scanner found behavior that needs review",
+        findings: [
+          {
+            ruleId: "dynamic-eval",
+            severity: "warn",
+            message: "Dynamic code execution",
+            file: "index.js",
+            line: 12,
+          },
+        ],
       },
     });
   });

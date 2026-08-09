@@ -218,6 +218,9 @@ function buildBlockedInstallResult(params: {
   return {
     ok: false,
     error: params.blocked.reason,
+    ...(params.blocked.installPolicyWarning
+      ? { installPolicyWarning: params.blocked.installPolicyWarning }
+      : {}),
     ...(params.blocked.code === "security_scan_failed"
       ? { code: PLUGIN_INSTALL_ERROR_CODE.SECURITY_SCAN_FAILED }
       : params.blocked.code === "security_scan_blocked"

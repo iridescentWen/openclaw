@@ -31,14 +31,28 @@ describe("plugin lifecycle protocol validators", () => {
         packageName: "memory-plus",
         version: "2.1.0",
         acknowledgeClawHubRisk: true,
+        acknowledgeInstallPolicyWarning: true,
       }),
     ).toBe(true);
-    expect(validatePluginsInstallParams({ source: "official", pluginId: "workboard" })).toBe(true);
+    expect(
+      validatePluginsInstallParams({
+        source: "official",
+        pluginId: "workboard",
+        acknowledgeInstallPolicyWarning: true,
+      }),
+    ).toBe(true);
     expect(
       validatePluginsInstallParams({
         source: "official",
         pluginId: "workboard",
         packageName: "memory-plus",
+      }),
+    ).toBe(false);
+    expect(
+      validatePluginsInstallParams({
+        source: "official",
+        pluginId: "workboard",
+        acknowledgeInstallPolicyWarning: "yes",
       }),
     ).toBe(false);
   });

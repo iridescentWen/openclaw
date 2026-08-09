@@ -1,6 +1,7 @@
 // Gateway control-plane handlers for cold plugin catalog and lifecycle operations.
 import {
   buildClawHubTrustErrorDetails,
+  INSTALL_POLICY_WARNING_ACKNOWLEDGEMENT_REQUIRED,
   ErrorCodes,
   errorShape,
   isClawHubTrustErrorCode,
@@ -23,6 +24,7 @@ import {
 } from "../../plugins/management-service.js";
 import { buildGatewayReloadPlan } from "../config-reload-plan.js";
 import { resolveGatewayReloadSettings } from "../config-reload-settings.js";
+import { readInstallPolicyWarningErrorDetails } from "../install-policy-warning-error-details.js";
 import type { GatewayRequestHandlers } from "./types.js";
 import { assertValidParams } from "./validation.js";
 
@@ -135,13 +137,20 @@ export const pluginsHandlers: GatewayRequestHandlers = {
         lifecycleError?.code && isClawHubTrustErrorCode(lifecycleError.code)
           ? lifecycleError.code
           : undefined;
-      const details = lifecycleError
+      const trustDetails = lifecycleError
         ? buildClawHubTrustErrorDetails({
             ...(trustCode ? { code: trustCode } : {}),
             ...(lifecycleError.version ? { version: lifecycleError.version } : {}),
             ...(lifecycleError.warning ? { warning: lifecycleError.warning } : {}),
           })
         : undefined;
+      const installPolicyDetails = lifecycleError?.installPolicyWarning
+        ? readInstallPolicyWarningErrorDetails({
+            installPolicyCode: INSTALL_POLICY_WARNING_ACKNOWLEDGEMENT_REQUIRED,
+            ...lifecycleError.installPolicyWarning,
+          })
+        : undefined;
+      const details = installPolicyDetails ?? trustDetails;
       respond(
         false,
         undefined,
