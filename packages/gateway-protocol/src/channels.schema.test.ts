@@ -43,6 +43,16 @@ describe("WebLoginWaitParamsSchema", () => {
         currentQrDataUrl: "data:image/png;base64,SGVsbG8=",
       }),
     ).toBe(false);
+    expect(
+      validate.Check({
+        currentQrDataUrl: "data:image/png;base64,iVBORw0KGgp=",
+      }),
+    ).toBe(false);
+    expect(
+      validate.Check({
+        currentQrDataUrl: PNG_DATA_URL.slice(0, -1),
+      }),
+    ).toBe(false);
   });
 });
 

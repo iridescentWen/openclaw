@@ -29,6 +29,8 @@ describe("createWhatsAppLoginTool", () => {
     const expression = new RegExp(pattern ?? "");
     expect(expression.test(PNG_DATA_URL)).toBe(true);
     expect(expression.test("data:image/png;base64,SGVsbG8=")).toBe(false);
+    expect(expression.test("data:image/png;base64,iVBORw0KGgp=")).toBe(false);
+    expect(expression.test(PNG_DATA_URL.slice(0, -1))).toBe(false);
     expect(expression.test("data:image/png;base64,")).toBe(false);
     expect(expression.test("data:image/jpeg;base64,YQ==")).toBe(false);
   });
