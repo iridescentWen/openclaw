@@ -98,11 +98,11 @@ export class CustodianSessionStore {
         this.emit();
       }
     },
-    onPoll: (client, stepId) => {
+    onPoll: (client, stepId, presentationGeneration) => {
       void this.requestReply(
         client,
         { sessionId: this.sessionId, pollStepId: stepId },
-        { pollStepId: stepId },
+        { pollStepId: stepId, qrPresentationGeneration: presentationGeneration },
       );
     },
   });
@@ -626,7 +626,11 @@ export class CustodianSessionStore {
   private async requestReply(
     client: GatewayBrowserClient,
     params: SystemAgentChatParams,
-    options?: { pollStepId?: string; onSent?: () => void },
+    options?: {
+      pollStepId?: string;
+      qrPresentationGeneration?: number;
+      onSent?: () => void;
+    },
   ): Promise<eventNudgeState.CustodianSendOutcome> {
     const context = this.context;
     if (!context) {
@@ -671,6 +675,16 @@ export class CustodianSessionStore {
       // An authoritative recovery response supersedes a failed QR acknowledgement.
       this.error = null;
       if (pollStepId && result.step?.type === "qr" && result.step.id === pollStepId) {
+        if (
+          options.qrPresentationGeneration !== undefined &&
+          !this.qrScheduler.isPollPresentationCurrent(pollStepId, options.qrPresentationGeneration)
+        ) {
+          // Expiry retired the credential while this request was in flight. A later poll can
+          // recover authoritative state, but this stale response must not resurrect QR bytes.
+          this.messages = scrubCustodianQrSteps(this.messages, pollStepId);
+          this.qrScheduler.schedulePoll(client, pollStepId);
+          return "sent";
+        }
         this.messages = replaceCustodianQrStep(this.messages, result.step);
         this.wizardInputPending = result.wizardInputPending === true;
         this.qrScheduler.scheduleStep(client, result.step);

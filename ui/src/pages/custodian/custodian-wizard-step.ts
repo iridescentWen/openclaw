@@ -18,11 +18,12 @@ export class CustodianQrScheduler {
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private expiryTimer: ReturnType<typeof setTimeout> | null = null;
   private stepId: string | null = null;
+  private presentationGeneration = 0;
 
   constructor(
     private readonly callbacks: {
       onExpire: (stepId: string, notify: boolean) => void;
-      onPoll: (client: GatewayBrowserClient, stepId: string) => void;
+      onPoll: (client: GatewayBrowserClient, stepId: string, generation: number) => void;
     },
   ) {}
 
@@ -36,6 +37,17 @@ export class CustodianQrScheduler {
       this.expiryTimer = null;
     }
     this.stepId = null;
+    this.presentationGeneration += 1;
+  }
+
+  isPollPresentationCurrent(stepId: string, generation: number): boolean {
+    return this.stepId === stepId && this.presentationGeneration === generation;
+  }
+
+  private retirePresentation(stepId: string): void {
+    if (this.stepId === stepId) {
+      this.presentationGeneration += 1;
+    }
   }
 
   beginAcknowledgement(
@@ -74,11 +86,13 @@ export class CustodianQrScheduler {
     const expiresInMs = step.expiresInMs;
     if (typeof expiresInMs === "number" && Number.isFinite(expiresInMs)) {
       if (expiresInMs <= 0) {
+        this.retirePresentation(step.id);
         this.callbacks.onExpire(step.id, false);
       } else {
         this.expiryTimer = setTimeout(
           () => {
             this.expiryTimer = null;
+            this.retirePresentation(step.id);
             this.callbacks.onExpire(step.id, true);
           },
           resolveSafeTimeoutDelayMs(expiresInMs, { minMs: 0 }),
@@ -95,7 +109,7 @@ export class CustodianQrScheduler {
     this.stepId = stepId;
     this.pollTimer = setTimeout(() => {
       this.pollTimer = null;
-      this.callbacks.onPoll(client, stepId);
+      this.callbacks.onPoll(client, stepId, this.presentationGeneration);
     }, SYSTEM_AGENT_QR_POLL_INTERVAL_MS);
   }
 }

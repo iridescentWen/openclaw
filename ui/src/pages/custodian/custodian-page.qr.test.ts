@@ -569,6 +569,30 @@ describe("custodian QR wizard step", () => {
     expect(page.store.messages.some((message) => message.step?.qrDataUrl)).toBe(false);
   });
 
+  it("does not restore an expired QR from a poll that started before expiry", async () => {
+    vi.useFakeTimers();
+    let resolvePoll!: (result: ReturnType<typeof qrResult>) => void;
+    const pendingPoll = new Promise<ReturnType<typeof qrResult>>((resolve) => {
+      resolvePoll = resolve;
+    });
+    const request = vi.fn().mockResolvedValueOnce(qrResult(2_000)).mockReturnValueOnce(pendingPoll);
+    const { page } = await mountPage(createContext(request).context);
+    await vi.advanceTimersByTimeAsync(0);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(request).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(page.querySelector(".wizard-step__qr")).toBeNull();
+
+    resolvePoll(qrResult(60_000));
+    await vi.advanceTimersByTimeAsync(0);
+    await page.updateComplete;
+
+    expect(page.querySelector(".wizard-step__qr")).toBeNull();
+    expect(page.textContent).toContain("This QR code expired.");
+    expect(page.store.messages.some((message) => message.step?.qrDataUrl)).toBe(false);
+  });
+
   it("keeps polling and offers typed cancellation after QR expiry", async () => {
     vi.useFakeTimers();
     const pendingResult = {
