@@ -205,17 +205,24 @@ describe("zalouser setup wizard", () => {
     );
   });
 
-  it("does not wait after forced re-login rejects the QR image", async () => {
-    checkZaloAuthenticatedMock.mockResolvedValueOnce(true);
+  it.each([
+    { name: "first login", authenticated: false },
+    { name: "forced re-login", authenticated: true },
+  ])("recovers when $name cannot present its QR image", async ({ authenticated }) => {
+    checkZaloAuthenticatedMock.mockResolvedValueOnce(authenticated);
     startZaloQrLoginMock.mockResolvedValueOnce({
       message: "qr pending",
       qrDataUrl: "data:text/plain;base64,bm90LWEtcG5n",
     });
     waitForZaloQrLoginMock.mockClear();
     const note = vi.fn(async (_message: string, _title?: string) => {});
+    const confirmations: string[] = [];
     const prompter = createTestWizardPrompter({
       note,
-      confirm: vi.fn(async () => false),
+      confirm: vi.fn(async ({ message }: { message: string }) => {
+        confirmations.push(message);
+        return message !== "Zalo Personal already logged in. Keep session?";
+      }),
     });
 
     await runSetup({ prompter });
@@ -224,6 +231,7 @@ describe("zalouser setup wizard", () => {
       expect.stringContaining("Could not write QR image file"),
       "QR Login",
     );
+    expect(confirmations).not.toContain("Did you scan and approve the QR on your phone?");
     expect(waitForZaloQrLoginMock).not.toHaveBeenCalled();
   });
 

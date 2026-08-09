@@ -341,10 +341,12 @@ export const zalouserSetupWizard: ChannelSetupWizard = {
             ].join("\n"),
             t("wizard.zalouser.qrLoginTitle"),
           );
-          const scanned = await prompter.confirm({
-            message: t("wizard.zalouser.qrScannedPrompt"),
-            initialValue: true,
-          });
+          const scanned = qrPath
+            ? await prompter.confirm({
+                message: t("wizard.zalouser.qrScannedPrompt"),
+                initialValue: true,
+              })
+            : false;
           if (scanned) {
             const waited = await waitForZaloQrLogin({
               profile: account.profile,
@@ -388,10 +390,12 @@ export const zalouserSetupWizard: ChannelSetupWizard = {
             ].join("\n"),
             t("wizard.zalouser.qrLoginTitle"),
           );
-          const scanned = await prompter.confirm({
-            message: t("wizard.zalouser.qrScannedPrompt"),
-            initialValue: true,
-          });
+          const scanned = qrPath
+            ? await prompter.confirm({
+                message: t("wizard.zalouser.qrScannedPrompt"),
+                initialValue: true,
+              })
+            : false;
           if (scanned) {
             const waited = await waitForZaloQrLogin({
               profile: account.profile,
