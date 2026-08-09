@@ -202,8 +202,7 @@ export async function finishGatewayStartup(params: {
     log,
   });
   const gatewayRequestContext = await startupTrace.measure("gateway.request-context", async () => {
-    const { createGatewayRequestContext } = await import("./server-request-context.js");
-    return createGatewayRequestContext({
+    return (await import("./server-request-context.js")).createGatewayRequestContext({
       deps,
       runtimeState,
       sessionCompanion,
