@@ -922,10 +922,22 @@ export class SystemAgentChatEngine {
       this.retainedQrTerminalReply = { stepId: answer.stepId, reply: { ...completedReply } };
       return completedReply;
     }
+    if (step) {
+      if (!step.qrDataUrl && !bridge.session.hasOwnedQrPresentation()) {
+        this.clearWizardExpiry(bridge);
+      }
+      bridge.step = null;
+    }
     const validationError = await bridge.session.answer(answer.stepId, answer.value);
+    if (validationError && step) {
+      bridge.step = step;
+      if (step.qrDataUrl) {
+        this.armWizardQrExpiry(bridge);
+      }
+    }
     const text = validationError
       ? [validationError, ...(step ? [renderWizardStep(step)] : [])].join("\n\n")
-      : await this.pumpWizardBridge();
+      : (this.renderPendingQrOwner(bridge) ?? (await this.pumpWizardBridge()));
     const completedReply = this.completeTurn(
       { text, action: "none" },
       step ? formatStructuredWizardAnswerForHistory(step, answer.value) : "Continue",
@@ -1981,6 +1993,13 @@ export class SystemAgentChatEngine {
     this.wizardBridge = null;
   }
 
+  private renderPendingQrOwner(bridge: ActiveWizardBridge): string | null {
+    if (!bridge.session.hasExternalQrPresentationOwner()) {
+      return null;
+    }
+    return "QR acknowledged. Setup is still finishing this link attempt. Say `cancel` to stop it.";
+  }
+
   private async startModelSetup(_workspace: string | undefined): Promise<SystemAgentChatReply> {
     this.clearPendingProposals();
     return {
@@ -2296,7 +2315,7 @@ export class SystemAgentChatEngine {
     }
     const step = bridge.step;
     if (!step) {
-      return await this.pumpWizardBridge();
+      return this.renderPendingQrOwner(bridge) ?? (await this.pumpWizardBridge());
     }
     const answer = parseWizardAnswer(step, text);
     if (!answer) {
@@ -2318,7 +2337,7 @@ export class SystemAgentChatEngine {
       }
       return [validationError, renderWizardStep(step)].join("\n\n");
     }
-    return await this.pumpWizardBridge();
+    return this.renderPendingQrOwner(bridge) ?? (await this.pumpWizardBridge());
   }
 }
 /* oxlint-disable max-lines -- TODO: split this grandfathered oversized file. */
