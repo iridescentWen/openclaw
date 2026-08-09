@@ -110,6 +110,37 @@ describe("custodian QR wizard step", () => {
     });
   });
 
+  it("keeps polling when acknowledgement enters non-input settlement", async () => {
+    vi.useFakeTimers();
+    const settlingResult = {
+      sessionId: SESSION_ID,
+      reply: "Setup is still finishing the QR attempt.",
+      action: "none" as const,
+      wizardSettling: true,
+    };
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(qrResult())
+      .mockResolvedValueOnce(settlingResult)
+      .mockResolvedValueOnce(terminalResult("Device linked."));
+    const { page } = await mountPage(createContext(request).context);
+    await vi.advanceTimersByTimeAsync(0);
+
+    page.querySelector<HTMLButtonElement>(".custodian__wizard-step .btn.primary")?.click();
+    await waitForFast(() => expect(request).toHaveBeenCalledTimes(2));
+    expect(page.store.wizardInputPending).toBe(false);
+    expect(page.store.wizardSettling).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    await waitForFast(() => expect(request).toHaveBeenCalledTimes(3));
+    expect(request.mock.calls[2]?.[1]).toEqual({
+      sessionId: SESSION_ID,
+      pollStepId: "qr-step",
+    });
+    expect(page.store.wizardSettling).toBe(false);
+    expect(page.textContent).toContain("Device linked.");
+  });
+
   it("keeps the QR and resumes polling when Continue was definitely unsent", async () => {
     vi.useFakeTimers();
     const request = vi
@@ -599,7 +630,7 @@ describe("custodian QR wizard step", () => {
       sessionId: SESSION_ID,
       reply: "Setup is still finishing the QR attempt.",
       action: "none" as const,
-      wizardInputPending: true,
+      wizardSettling: true,
     };
     const request = vi
       .fn()
@@ -614,6 +645,8 @@ describe("custodian QR wizard step", () => {
     await page.updateComplete;
     expect(page.querySelector(".wizard-step__qr")).toBeNull();
     expect(page.textContent).toContain("This QR code expired.");
+    expect(page.store.wizardInputPending).toBe(false);
+    expect(page.store.wizardSettling).toBe(true);
 
     await vi.advanceTimersByTimeAsync(1_000);
     expect(request.mock.calls.filter((call) => call[1]?.pollStepId === "qr-step")).toHaveLength(2);

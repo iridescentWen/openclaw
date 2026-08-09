@@ -66,7 +66,9 @@ export class CustodianQrScheduler {
       }
       if (outcome !== "rejected" && !delivered) {
         delivered = true;
-        if (this.stepId === stepId) {
+        // A received acknowledgement may already have scheduled observation of this step.
+        // Clear only pre-response state so the replacement settlement poll survives.
+        if (this.stepId === stepId && this.pollTimer === null) {
           this.clear();
         }
         this.callbacks.onExpire(stepId, true);
