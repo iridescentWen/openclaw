@@ -1208,6 +1208,58 @@ describe("SystemAgentChatEngine", () => {
     expect(engine.historySince(historyLength)).toHaveLength(1);
   });
 
+  it("retains a delayed owner-completion audit for restart fencing", async () => {
+    let settleOwner!: () => void;
+    const owner = new Promise<void>((resolve) => {
+      settleOwner = resolve;
+    });
+    let releaseAudit!: () => void;
+    const auditGate = new Promise<void>((resolve) => {
+      releaseAudit = resolve;
+    });
+    const appendAuditEntry = vi.fn(async () => {
+      await auditGate;
+      return "state/openclaw.sqlite";
+    });
+    const persistBackgroundHistory = vi.fn();
+    const engine = new SystemAgentChatEngine({
+      runAgentTurn: async () => null,
+      planWithAssistant: async () => null,
+      deps: { loadOverview: fakeOverviewLoader() },
+      supportsQrCode: true,
+      appendAuditEntry,
+      persistBackgroundHistory,
+      runChannelSetupWizard: async (_channel, prompter) => {
+        await prompter.qrCode?.({
+          title: "Link a device",
+          message: "Scan this QR code, then continue.",
+          text: QR_TEXT,
+          dismissed: owner,
+          expiresAtMs: Date.now() + 60_000,
+        });
+      },
+    });
+
+    await engine.handle("connect telegram");
+    settleOwner();
+    await vi.waitFor(() => expect(appendAuditEntry).toHaveBeenCalledOnce());
+
+    const retirementSettlement = engine.getPersistentApplySettlement();
+    try {
+      expect(retirementSettlement).not.toBeNull();
+      let settled = false;
+      void retirementSettlement?.then(() => {
+        settled = true;
+      });
+      await Promise.resolve();
+      expect(settled).toBe(false);
+    } finally {
+      releaseAudit();
+      await vi.waitFor(() => expect(persistBackgroundHistory).toHaveBeenCalledOnce());
+      await engine.dispose();
+    }
+  });
+
   it("accepts a late QR acknowledgement after polling projects the next step", async () => {
     let settleOwner!: () => void;
     const owner = new Promise<void>((resolve) => {

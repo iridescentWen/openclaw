@@ -775,6 +775,16 @@ export class SystemAgentChatEngine {
     return this.persistentApplySettlement;
   }
 
+  private retainPersistentApplySettlement(settlement: Promise<void>): void {
+    this.persistentApplySettlement = settlement;
+    const clearSettlement = () => {
+      if (this.persistentApplySettlement === settlement) {
+        this.persistentApplySettlement = null;
+      }
+    };
+    void settlement.then(clearSettlement, clearSettlement);
+  }
+
   getPendingOperatorProposal(): { operation: SystemAgentOperation; hash: string } | null {
     return resolvePendingOperatorProposal(this.pending, this.agentSession.proposalRef);
   }
@@ -1716,13 +1726,7 @@ export class SystemAgentChatEngine {
         const settlement = (this.wizardBridge?.session.whenSettled() ?? this.turnQueue).then(
           () => undefined,
         );
-        this.persistentApplySettlement = settlement;
-        const clearSettlement = () => {
-          if (this.persistentApplySettlement === settlement) {
-            this.persistentApplySettlement = null;
-          }
-        };
-        void settlement.then(clearSettlement, clearSettlement);
+        this.retainPersistentApplySettlement(settlement);
         return route;
       }
     } catch (error) {
@@ -2044,6 +2048,9 @@ export class SystemAgentChatEngine {
         }
       }
     });
+    // This completion persists audit/history after the QR owner has settled. Keep it in the
+    // cross-Gateway fence so a timed-out shutdown cannot overlap it with replacement work.
+    this.retainPersistentApplySettlement(finalization);
     this.turnQueue = finalization.catch(() => undefined);
   }
 
