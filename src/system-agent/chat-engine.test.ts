@@ -1002,6 +1002,43 @@ describe("SystemAgentChatEngine", () => {
     expect(cancelled).not.toHaveProperty("step");
   });
 
+  it("accepts a retransmitted acknowledgement after an acknowledged QR owner settles", async () => {
+    let settleOwner!: () => void;
+    const owner = new Promise<void>((resolve) => {
+      settleOwner = resolve;
+    });
+    let releaseRunner!: () => void;
+    const runnerGate = new Promise<void>((resolve) => {
+      releaseRunner = resolve;
+    });
+    let runnerReachedGate = false;
+    const engine = createQrEngine(async (_channel, prompter) => {
+      await prompter.qrCode?.({
+        title: "Link a device",
+        message: "Scan this QR code, then continue.",
+        text: QR_TEXT,
+        dismissed: owner,
+        expiresAtMs: Date.now() + 60_000,
+      });
+      await owner;
+      runnerReachedGate = true;
+      await runnerGate;
+    });
+    const prompt = await engine.handle("connect telegram");
+    const stepId = expectDefined(prompt.step, "QR step").id;
+
+    const acknowledged = await engine.answerWizard({ stepId });
+    expect(acknowledged.text).toContain("still finishing this link attempt");
+    settleOwner();
+    await vi.waitFor(() => expect(runnerReachedGate).toBe(true));
+
+    const retransmitted = await engine.answerWizard({ stepId });
+    expect(retransmitted.text).toContain("still finishing this link attempt");
+
+    releaseRunner();
+    await vi.waitFor(() => expect(engine.hasPendingQrCode()).toBe(false));
+  });
+
   it("cancels an externally owned QR after its presentation deadline", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_800_000_000_000);

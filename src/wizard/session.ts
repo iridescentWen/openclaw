@@ -494,6 +494,9 @@ export class WizardSession {
     this.onQrPresentationOwnerSettled?.(stepId);
     const pending = this.answerDeferred.get(stepId);
     if (!pending) {
+      // The client may have acknowledged before the external owner settles. Preserve one
+      // retransmission so a lost acknowledgement reply cannot fail the hosted session.
+      this.rememberDismissedStep(stepId);
       return false;
     }
     this.answerDeferred.delete(stepId);
