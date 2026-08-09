@@ -245,11 +245,12 @@ OpenClaw already computes project identity twice without naming it: the
 worktree service derives `originUrl` + a 16-char repo fingerprint
 (`src/agents/worktrees/service.ts:199-205`), and the sessions catalog groups
 Codex/Claude rows by project folder, folding `.claude/worktrees/<name>` into
-its origin repo. This component promotes that to a first-class read model —
-derived, never registered, same pattern as `environments.list`:
+its origin repo. This component promotes that to a first-class observed read
+model alongside the registered projects already returned by `projects.list`,
+following the same computed pattern as `environments.list`:
 
-- **`projects.list` read model** (computed on demand, no new store): group
-  known checkouts by repo fingerprint → `{ name, originUrl, checkouts:
+- **`projects.list.observedProjects` read model** (computed on demand, no new
+  store): group known checkouts by repo fingerprint → `{ name, originUrl, checkouts:
 [{runnerId, path}], lastUsedAt }`. Sources: session rows
   (`execCwd`/`execNode`), the managed-worktree registry, and
   device-advertised workdirs (below). "GitHub-ness" is just the originUrl
@@ -268,9 +269,8 @@ derived, never registered, same pattern as `environments.list`:
   existing per-runner folder browser as the escape hatch.
 - **Forge integration is a later, separable phase**: repo lists from GitHub,
   clone-a-repo-you've-never-touched, PR status on session rows. The derived
-  model needs none of it; registration-style project creation (the
-  cloud-only-product pattern) is explicitly rejected — projects appear
-  because you worked on them.
+  observed model needs none of it; checkouts appear because you worked on
+  them, while explicit registration remains the separate project-start flow.
 
 ### 4. UI convergence
 

@@ -21,6 +21,8 @@ export const AgentControlProtocolSchemas = {
   EnvironmentsStatusResult: environments.EnvironmentsStatusResultSchema,
   WorkerDesktopObserveParams: environments.WorkerDesktopObserveParamsSchema,
   WorkerDesktopObserveResult: environments.WorkerDesktopObserveResultSchema,
+  ProjectCheckout: projects.ProjectCheckoutSchema,
+  ProjectSummary: projects.ProjectSummarySchema,
   SystemInfoParams: systemInfo.SystemInfoParamsSchema,
   SystemInfoResult: systemInfo.SystemInfoResultSchema,
   AgentEvent: agent.AgentEventSchema,

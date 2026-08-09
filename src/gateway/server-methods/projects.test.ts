@@ -2,13 +2,36 @@ import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { expect, test } from "vitest";
+import { beforeEach, expect, test, vi } from "vitest";
+import type { SessionEntry } from "../../config/sessions.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { registerProjectRegistry } from "../../projects/project-registry.js";
 import { createOpenClawTestState } from "../../test-utils/openclaw-test-state.js";
-import { projectsHandlers } from "./projects.js";
+import { createProjectsHandlers } from "./projects.js";
 
 const execFileAsync = promisify(execFile);
+
+const seededSessions = vi.hoisted(() => ({
+  store: {} as Record<string, SessionEntry>,
+}));
+
+vi.mock("../session-utils.js", () => ({
+  loadCombinedSessionStoreForGateway: () => ({ store: seededSessions.store }),
+}));
+
+beforeEach(() => {
+  seededSessions.store = {};
+});
+
+const projectsHandlers = createProjectsHandlers({
+  list: async () => [],
+  resolveRepositoryIdentity: async (checkoutPath: string) => ({
+    checkoutRoot: checkoutPath,
+    repoRoot: checkoutPath,
+    originUrl: "",
+    fingerprint: checkoutPath,
+  }),
+} as never);
 
 async function initializeRepository(root: string): Promise<string> {
   const repo = path.join(root, "registered");

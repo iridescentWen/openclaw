@@ -787,6 +787,22 @@ export class ManagedWorktreeService {
     };
   }
 
+  /** Resolves the repository facts shared by managed worktrees and project discovery. */
+  async resolveRepositoryIdentity(repoRoot: string): Promise<{
+    checkoutRoot: string;
+    repoRoot: string;
+    originUrl: string;
+    fingerprint: string;
+  }> {
+    const resolved = await resolveRepository(repoRoot);
+    return {
+      checkoutRoot: resolved.sourceRoot,
+      repoRoot: resolved.repoRoot,
+      originUrl: resolved.originUrl,
+      fingerprint: resolved.fingerprint,
+    };
+  }
+
   /**
    * Lists selectable base refs for a repository without touching the network.
    * Base-ref pickers must stay snappy; resolveWorktreeBase() still fetches on create
