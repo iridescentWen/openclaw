@@ -7,6 +7,7 @@ import {
 } from "../index.js";
 import {
   SystemAgentChatQuestionSchema,
+  SystemAgentChatResultSchema,
   SystemAgentChatHistoryResultSchema,
   SystemAgentSetupDetectResultSchema,
   SystemAgentSetupVerifyResultSchema,
@@ -95,6 +96,19 @@ describe("OpenClaw chat question protocol", () => {
     expect(Value.Check(SystemAgentChatQuestionSchema, { ...question, skipAction: "dismiss" })).toBe(
       false,
     );
+  });
+});
+
+describe("OpenClaw chat result protocol", () => {
+  it("accepts an explicit non-input wizard settlement state", () => {
+    expect(
+      Value.Check(SystemAgentChatResultSchema, {
+        sessionId: "session-1",
+        reply: "Setup is still finishing the QR attempt.",
+        action: "none",
+        wizardSettling: true,
+      }),
+    ).toBe(true);
   });
 });
 

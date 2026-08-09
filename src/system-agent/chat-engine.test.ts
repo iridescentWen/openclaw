@@ -1113,10 +1113,13 @@ describe("SystemAgentChatEngine", () => {
     const stepId = expectDefined(prompt.step, "QR step").id;
     vi.setSystemTime(1_800_000_001_000);
 
-    await expect(engine.pollStep(stepId)).resolves.toMatchObject({
+    const settling = await engine.pollStep(stepId);
+    expect(settling).toMatchObject({
       text: "Setup is still finishing the QR attempt.",
-      wizardInputPending: true,
+      wizardSettling: true,
     });
+    expect(settling).not.toHaveProperty("wizardInputPending");
+    expect(settling).not.toHaveProperty("step");
 
     const cancelled = await engine.answerWizard({ stepId, value: false });
     expect(abortObserved).toBe(true);
@@ -1392,10 +1395,13 @@ describe("SystemAgentChatEngine", () => {
     await vi.waitFor(() => expect(runnerReachedGate).toBe(true));
     const historyLength = engine.historyLength();
 
-    await expect(engine.pollStep(stepId)).resolves.toMatchObject({
+    const settling = await engine.pollStep(stepId);
+    expect(settling).toMatchObject({
       text: "Setup is still finishing the QR attempt.",
-      wizardInputPending: true,
+      wizardSettling: true,
     });
+    expect(settling).not.toHaveProperty("wizardInputPending");
+    expect(settling).not.toHaveProperty("step");
     let disposed = false;
     const disposal = engine.dispose().then(() => {
       disposed = true;

@@ -184,4 +184,21 @@ describe("system-agent chat input", () => {
       step: { id: "channel", type: "select" },
     });
   });
+
+  it("preserves non-input wizard settlement in the gateway result", () => {
+    expect(
+      buildSystemAgentChatResult({
+        sessionId: "s1",
+        reply: {
+          text: "Setup is still finishing the QR attempt.",
+          action: "none",
+          wizardSettling: true,
+        },
+      }),
+    ).toMatchObject({
+      sessionId: "s1",
+      action: "none",
+      wizardSettling: true,
+    });
+  });
 });
