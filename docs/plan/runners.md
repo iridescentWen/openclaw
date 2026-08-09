@@ -13,18 +13,18 @@ Proposal, revision 1. Implementation in progress (autonomous build started
 2026-08-08; this section tracks live status — update it in every PR that
 advances a milestone).
 
-| #   | Milestone                                            | Status      | PRs     |
-| --- | ---------------------------------------------------- | ----------- | ------- |
-| 0   | This plan                                            | landed      | —       |
-| 1a  | Naming: session copy revert                          | landed      | #120667 |
-| 1b  | Naming: devices consolidation                        | landed      | #120689 |
-| 1c  | Cleanup: node-pairing → device-pairing merge         | not started | —       |
-| 2   | `openclaw resume` + web Continue in terminal         | in progress | #120664 |
-| 3   | `oc-pair://` one-paste pairing                       | not started | —       |
-| 4   | Picker + enrichment + projects read model            | not started | —       |
-| 5   | Device runners                                       | not started | —       |
-| 6   | Stop-and-continue moves                              | not started | —       |
-| 7   | Deletions (ssh sandbox, openshell, exec-host clones) | not started | —       |
+| #   | Milestone                                            | Status      | PRs                                                         |
+| --- | ---------------------------------------------------- | ----------- | ----------------------------------------------------------- |
+| 0   | This plan                                            | landed      | —                                                           |
+| 1a  | Naming: session copy revert                          | landed      | [#120667](https://github.com/openclaw/openclaw/pull/120667) |
+| 1b  | Naming: devices consolidation                        | landed      | [#120689](https://github.com/openclaw/openclaw/pull/120689) |
+| 1c  | Cleanup: node-pairing → device-pairing merge         | not started | —                                                           |
+| 2   | `openclaw resume` + web Continue in terminal         | in progress | [#120664](https://github.com/openclaw/openclaw/pull/120664) |
+| 3   | `oc-pair://` one-paste pairing                       | not started | —                                                           |
+| 4   | Picker + projects read model                         | in review   | [#120804](https://github.com/openclaw/openclaw/pull/120804) |
+| 5   | Device runners                                       | not started | —                                                           |
+| 6   | Stop-and-continue moves                              | not started | —                                                           |
+| 7   | Deletions (ssh sandbox, openshell, exec-host clones) | not started | —                                                           |
 
 Proposal history: direction agreed 2026-08-08 after a
 code-evidence investigation (three deep-reads of the worker, exec, and node
@@ -284,18 +284,19 @@ chips stay: they are structured facts, not status. Placement on a running
 session is quiet text ("on aws"), not a badged widget — the activity spinner
 already carries liveness.
 
-- **Enrich `EnvironmentSummary` additively** (protocol, no migration):
-  `trust: "persistent" | "disposable"`, `sessionHost: boolean`, `platform`,
-  and for profiles a provider-supplied `class` label. No pricing fields until
-  a provider actually supplies prices.
+- **Use the existing environment type discriminant** for picker grouping:
+  local gateway, connected execution-capable nodes, worker environments, and
+  the separate cloud profiles list. `sessionHost` is deferred to milestone 5,
+  where device runners introduce the capability fact that needs it.
 - **Where picker regrouped** (`ui/src/pages/new-session/place-picker.ts`):
   sections "This gateway" / "Your devices" (session-capable, connected
   devices only — phones and offline devices stay hidden by gating) / "Cloud".
   Folder and destination stay orthogonal. Copy: "Runs on {place}".
-- **Placement chip** on the session header: shows current placement and
-  state; menu offers exactly reclaim ("Bring home") for cloud placements
-  today, plus stop-and-continue moves once device runners ship. Reuses the
-  placement subscription the sidebar badges already consume.
+- **Placement chip** on the session header: shows quiet current placement;
+  the menu reuses the canonical Stop cloud worker action (active placements
+  reclaim through `sessions.reclaim`). Stop-and-continue moves arrive once
+  device runners ship. Reuses the placement subscription the sidebar badges
+  already consume.
 - **Devices page**: fold live-sessions-per-device into the existing
   `ui/src/pages/nodes/` surface (renamed to devices end-to-end). No new
   top-level nav item; the picker's "Connect a device…" foot links here.
@@ -346,10 +347,9 @@ Independently mergeable PR series, roughly in order; 1–3 can interleave.
    terminal".
 3. **Pairing**: `oc-pair://`, `node run --pair`, TLS pin in payload, node
    profile in the pairing UI.
-4. **Picker + enrichment**: additive `EnvironmentSummary` fields, regrouped
-   Where picker, placement chip (display + reclaim), `projects.list` read
-   model + project-first picker flow (gateway-side checkouts only until 5
-   adds device advertisement).
+4. **Picker + projects**: regrouped Where picker, placement chip (display +
+   reclaim), `projects.list` read model + project-first picker flow
+   (gateway-side checkouts only until 5 adds device advertisement).
 5. **Device runners**: device worker provider (SSH transport first), pinned
    bundle install with per-device consent, checkout advertisement
    (`{path, originUrl}` in the enablement handshake), `runner-offline`

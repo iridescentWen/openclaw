@@ -25,6 +25,7 @@ import {
 } from "../../lib/sessions/session-key.ts";
 import { normalizeOptionalString } from "../../lib/string-coerce.ts";
 import { renderBoardViewSwitch } from "./board-session-surface.ts";
+import { resolveChatPanePlacement } from "./chat-pane-placement.ts";
 import { ChatPaneSessionMenu } from "./chat-pane-session-menu.ts";
 import { readChatSessionActionAccess } from "./chat-session-action-access.ts";
 import { renderBackgroundTasksToggle } from "./components/chat-background-tasks-render.ts";
@@ -174,6 +175,11 @@ export abstract class ChatPaneHeader extends ChatPaneSessionMenu {
           </button>
         </openclaw-tooltip>`
       : nothing;
+    const placement = resolveChatPanePlacement({
+      gatewaySnapshot: this.context.gateway.snapshot,
+      reclaimingKey: this.headerPlacementReclaimingKey,
+      row,
+    });
     return renderChatPaneHeader({
       paneId: this.paneId,
       narrow: this.narrow,
@@ -310,6 +316,7 @@ export abstract class ChatPaneHeader extends ChatPaneSessionMenu {
               .onAction=${(action: HeaderMenuAction) => this.handleHeaderSessionAction(action, row)}
             ></openclaw-chat-header-session-menu>`
           : nothing,
+      placementReclaimDisabledReason: placement.reclaimDisabledReason,
       nativeGateways: this.nativeGateways,
       gatewaysSnapshot: this.gatewaysSnapshot,
       onboarding: this.onboarding,
@@ -329,6 +336,7 @@ export abstract class ChatPaneHeader extends ChatPaneSessionMenu {
           this.handleHeaderMenuAction(action, row, workspace.root, branch);
         }
       },
+      onPlacementReclaim: () => row && void this.reclaimHeaderPlacement(row),
       onBranchSelect: (leafEntryId) => {
         const access = readChatSessionActionAccess(
           this.context.gateway.snapshot,
