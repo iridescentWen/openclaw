@@ -16,6 +16,9 @@ import { LoginQRCallbackEventType } from "./zca-constants.js";
 
 const createZaloMock = vi.hoisted(() => vi.fn());
 const ISO_TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u;
+const PNG_1X1 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
+const GIF_1X1 = "R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
 vi.mock("./zca-client.js", () => ({
   createZalo: createZaloMock,
@@ -149,7 +152,7 @@ describe("zalouser credential persistence", () => {
           type: LoginQRCallbackEventType.QRCodeGenerated,
           data: {
             code: "qr-code",
-            image: "data:image/png;base64,abc123",
+            image: `data:image/png;base64,${PNG_1X1}`,
           },
           actions: {
             saveToFile: vi.fn(async () => undefined),
@@ -188,6 +191,92 @@ describe("zalouser credential persistence", () => {
     }
   });
 
+  it("rejects a non-PNG QR image and allows an immediate valid retry", async () => {
+    const profile = "qr-invalid-image-retry";
+    const firstAbort = vi.fn();
+    let rejectFirstLogin: (error: Error) => void = () => undefined;
+    const firstLogin = new Promise<API>((_resolve, reject) => {
+      rejectFirstLogin = reject;
+    });
+    let resolveSecondLogin: (api: API) => void = () => undefined;
+    const secondLogin = new Promise<API>((resolve) => {
+      resolveSecondLogin = resolve;
+    });
+    let secondCallback: ((event: LoginQRCallbackEvent) => unknown) | undefined;
+    const api = createMockApi({
+      imei: "retry-imei",
+      userAgent: "retry-user-agent",
+      language: "vi",
+      cookies: [{ key: "zpsid", value: "retry", domain: "chat.zalo.me" }],
+    });
+
+    createZaloMock
+      .mockResolvedValueOnce({
+        loginQR: async (_options: unknown, callback?: (event: LoginQRCallbackEvent) => unknown) => {
+          callback?.({
+            type: LoginQRCallbackEventType.QRCodeGenerated,
+            data: {
+              code: "invalid-qr",
+              image: `data:image/gif;base64,${GIF_1X1}`,
+            },
+            actions: {
+              saveToFile: vi.fn(async () => undefined),
+              retry: vi.fn(),
+              abort: () => {
+                firstAbort();
+                rejectFirstLogin(new Error("aborted invalid QR login"));
+              },
+            },
+          });
+          return await firstLogin;
+        },
+      })
+      .mockResolvedValueOnce({
+        loginQR: async (_options: unknown, callback?: (event: LoginQRCallbackEvent) => unknown) => {
+          secondCallback = callback;
+          callback?.({
+            type: LoginQRCallbackEventType.QRCodeGenerated,
+            data: {
+              code: "valid-qr",
+              image: PNG_1X1,
+            },
+            actions: {
+              saveToFile: vi.fn(async () => undefined),
+              retry: vi.fn(),
+              abort: vi.fn(),
+            },
+          });
+          return await secondLogin;
+        },
+      });
+
+    const rejected = await startZaloQrLogin({ profile, timeoutMs: 1000 });
+
+    expect(rejected.qrDataUrl).toBeUndefined();
+    expect(rejected.message).toContain("invalid or non-PNG QR image");
+    expect(firstAbort).toHaveBeenCalledTimes(1);
+
+    const started = await startZaloQrLogin({ profile, timeoutMs: 1000 });
+    expect(started.qrDataUrl).toBe(`data:image/png;base64,${PNG_1X1}`);
+
+    secondCallback?.({
+      type: LoginQRCallbackEventType.GotLoginInfo,
+      data: {
+        cookie: [{ key: "zpsid", value: "retry", domain: "chat.zalo.me" }],
+        imei: "retry-imei",
+        userAgent: "retry-user-agent",
+      },
+      actions: null,
+    });
+    resolveSecondLogin(api);
+
+    await expect(waitForZaloQrLogin({ profile, timeoutMs: 1000 })).resolves.toEqual({
+      connected: true,
+      message: "Login successful.",
+    });
+    expect(createZaloMock).toHaveBeenCalledTimes(2);
+  });
+
   it("revalidates setup ownership immediately before QR credentials are written", async () => {
     const stateDir = await mkdtemp(path.join(os.tmpdir(), "openclaw-zalouser-credentials-"));
     const profile = "qr-stale-owner";
@@ -207,7 +296,7 @@ describe("zalouser credential persistence", () => {
           type: LoginQRCallbackEventType.QRCodeGenerated,
           data: {
             code: "qr-code",
-            image: "data:image/png;base64,abc123",
+            image: `data:image/png;base64,${PNG_1X1}`,
           },
           actions: {
             saveToFile: vi.fn(async () => undefined),

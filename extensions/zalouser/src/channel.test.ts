@@ -19,6 +19,9 @@ import {
   waitForZaloQrLoginMock,
 } from "./zalo-js.test-mocks.js";
 
+const PNG_1X1 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
+
 vi.mock("./qr-temp-file.js", () => ({
   writeQrDataUrlToTempFile: vi.fn(async () => null),
 }));
@@ -525,7 +528,7 @@ describe("zalouser account resolution", () => {
 
     startZaloQrLoginMock.mockResolvedValue({
       message: "qr ready",
-      qrDataUrl: "data:image/png;base64,abc",
+      qrDataUrl: `data:image/png;base64,${PNG_1X1}`,
     } as never);
     waitForZaloQrLoginMock.mockResolvedValue({
       connected: true,

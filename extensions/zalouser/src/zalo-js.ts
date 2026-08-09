@@ -3,6 +3,7 @@ import path from "node:path";
 import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
 // Zalouser plugin module implements zalo js behavior.
 import { expectDefined } from "openclaw/plugin-sdk/expect-runtime";
+import { sanitizeInlineImageDataUrl } from "openclaw/plugin-sdk/inline-image-data-url-runtime";
 import { extensionForMime } from "openclaw/plugin-sdk/media-mime";
 import {
   asDateTimestampMs,
@@ -1527,10 +1528,17 @@ export async function startZaloQrLogin(params: {
 
           switch (event.type) {
             case LoginQRCallbackEventType.QRCodeGenerated: {
-              const image = event.data.image.replace(/^data:image\/png;base64,/, "");
-              current.qrDataUrl = image.startsWith("data:image")
+              const image = event.data.image.trim();
+              const candidate = image.toLowerCase().startsWith("data:")
                 ? image
                 : `data:image/png;base64,${image}`;
+              const normalized = sanitizeInlineImageDataUrl(candidate);
+              if (!normalized?.startsWith("data:image/png;base64,")) {
+                delete current.qrDataUrl;
+                current.error = "Zalo returned an invalid or non-PNG QR image.";
+                break;
+              }
+              current.qrDataUrl = normalized;
               break;
             }
             case LoginQRCallbackEventType.QRCodeExpired: {
