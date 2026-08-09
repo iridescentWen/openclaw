@@ -784,7 +784,7 @@ describe("plugin management service", () => {
     );
 
     await installManagedPlugin({
-      request: { source: "official", pluginId: "diffs" },
+      request: { source: "official", pluginId: "diffs", acknowledgeInstallPolicyWarning: true },
       env: {},
     });
 
@@ -793,6 +793,7 @@ describe("plugin management service", () => {
         spec: "clawhub:@openclaw/diffs@2026.6.11",
         expectedPluginId: "diffs",
         expectedIntegrity: `sha256-${Buffer.from("a".repeat(64), "hex").toString("base64")}`,
+        onInstallPolicyWarning: expect.any(Function),
       }),
     );
   });

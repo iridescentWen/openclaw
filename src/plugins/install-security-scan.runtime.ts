@@ -26,7 +26,10 @@ import {
 } from "./dependency-denylist.js";
 import { getGlobalHookRunner } from "./hook-runner-global.js";
 import { createBeforeInstallHookPayload } from "./install-policy-context.js";
-import type { InstallSafetyOverrides } from "./install-security-scan.types.js";
+import type {
+  InstallPolicyWarningDetails,
+  InstallSafetyOverrides,
+} from "./install-security-scan.types.js";
 
 type InstallScanLogger = {
   warn?: (message: string) => void;
@@ -142,6 +145,7 @@ export type InstallSecurityScanResult = {
   blocked?: {
     code?: "security_scan_blocked" | "security_scan_failed";
     reason: string;
+    installPolicyWarning?: InstallPolicyWarningDetails;
   };
 };
 
@@ -1005,10 +1009,18 @@ async function runOperatorInstallPolicy(params: {
     logPolicyResult(result);
     return undefined;
   }
+  const installPolicyWarning: InstallPolicyWarningDetails = {
+    targetName: params.targetName,
+    targetType: params.targetType,
+    requestMode: params.requestMode,
+    reason: result.warning.reason,
+    ...(result.findings?.length ? { findings: result.findings } : {}),
+  };
   if (!params.onInstallPolicyWarning) {
     return {
       blocked: {
         code: "security_scan_blocked",
+        installPolicyWarning,
         reason: formatInstallPolicyNotice({
           decision: "warn",
           findings: result.findings,
