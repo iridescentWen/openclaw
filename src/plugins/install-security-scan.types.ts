@@ -1,6 +1,6 @@
 // Defines plugin install security scan result types.
 import type { OpenClawConfig } from "../config/types.openclaw.js";
-import type { InstallPolicyFinding } from "../security/install-policy.js";
+import type { InstallPolicyFinding, InstallPolicyRequestKind } from "../security/install-policy.js";
 
 export type InstallPolicyWarningDetails = {
   targetName: string;
@@ -10,11 +10,23 @@ export type InstallPolicyWarningDetails = {
   findings?: InstallPolicyFinding[];
 };
 
-export type InstallPolicyWarningAcknowledgementRequest = {
+/** Stable policy-stage facts that scope an approval without exposing scan internals to clients. */
+export type InstallPolicyWarningScanIdentity = {
+  requestKind: InstallPolicyRequestKind;
+  originType: string;
+  pluginContentType?: "bundle" | "package" | "file" | "dependency-tree";
+  skillInstallId?: string;
+};
+
+export type InstallPolicyWarningOccurrence = {
+  scan: InstallPolicyWarningScanIdentity;
+  warning: InstallPolicyWarningDetails;
+};
+
+export type InstallPolicyWarningAcknowledgementRequest = InstallPolicyWarningOccurrence & {
   targetName: string;
   targetType: "skill" | "plugin";
   requestMode: "install" | "update";
-  warning: InstallPolicyWarningDetails;
 };
 
 type InstallPolicyWarningAcknowledgementResult =

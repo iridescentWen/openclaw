@@ -802,7 +802,7 @@ describe("installPluginFromNpmSpec e2e", () => {
       throw new Error("expected installed package policy warning");
     }
     expect(result.code).toBe(PLUGIN_INSTALL_ERROR_CODE.SECURITY_SCAN_BLOCKED);
-    expect(result.installPolicyWarning?.reason).toBe("review installed package tree");
+    expect(result.installPolicyWarning?.warning.reason).toBe("review installed package tree");
     expect(result.npmResolution).toMatchObject({
       resolvedSpec: `${packageName}@${packageVersion.version}`,
       integrity: packageVersion.integrity,
@@ -830,7 +830,7 @@ describe("installPluginFromNpmSpec e2e", () => {
     if (result.ok) {
       throw new Error("expected preflight policy warning");
     }
-    expect(result.installPolicyWarning?.reason).toBe("review npm metadata");
+    expect(result.installPolicyWarning?.warning.reason).toBe("review npm metadata");
     expect(result.npmResolution).toMatchObject({
       resolvedSpec: `${packageName}@${packageVersion.version}`,
       integrity: packageVersion.integrity,

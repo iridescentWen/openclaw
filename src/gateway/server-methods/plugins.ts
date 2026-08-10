@@ -16,7 +16,7 @@ import {
 } from "../../../packages/gateway-protocol/src/index.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { searchInstallablePluginPackages } from "../../plugins/catalog-search.js";
-import type { InstallPolicyWarningDetails } from "../../plugins/install-security-scan.types.js";
+import type { InstallPolicyWarningOccurrence } from "../../plugins/install-security-scan.types.js";
 import {
   formatManagedPluginLifecycleError,
   installManagedPlugin,
@@ -40,7 +40,7 @@ type InstallPolicyAcknowledgement = {
   expiresAt: number;
   requestKey: string;
   resolvedRequest: ManagedPluginSourceInstallRequest;
-  warnings: InstallPolicyWarningDetails[];
+  warnings: InstallPolicyWarningOccurrence[];
 };
 
 const installPolicyAcknowledgements = new Map<string, InstallPolicyAcknowledgement>();
@@ -74,8 +74,8 @@ function pruneInstallPolicyAcknowledgements(now: number): void {
 function issueInstallPolicyAcknowledgement(params: {
   request: PluginsInstallParams;
   resolvedRequest: ManagedPluginSourceInstallRequest;
-  warning: InstallPolicyWarningDetails;
-  acknowledgedWarnings?: InstallPolicyWarningDetails[];
+  warning: InstallPolicyWarningOccurrence;
+  acknowledgedWarnings?: InstallPolicyWarningOccurrence[];
 }): string {
   const now = Date.now();
   pruneInstallPolicyAcknowledgements(now);
@@ -251,7 +251,7 @@ export const pluginsHandlers: GatewayRequestHandlers = {
         lifecycleError?.installPolicyWarning && lifecycleError.installPolicyResolvedRequest
           ? readInstallPolicyWarningErrorDetails({
               installPolicyCode: INSTALL_POLICY_WARNING_ACKNOWLEDGEMENT_REQUIRED,
-              ...lifecycleError.installPolicyWarning,
+              ...lifecycleError.installPolicyWarning.warning,
               acknowledgementToken: issueInstallPolicyAcknowledgement({
                 request: params,
                 resolvedRequest: lifecycleError.installPolicyResolvedRequest,

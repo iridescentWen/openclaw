@@ -2,7 +2,11 @@
 
 import { expectDefined } from "@openclaw/normalization-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { InstallPolicyWarningDetails } from "../../plugins/install-security-scan.types.js";
+import type {
+  InstallPolicyWarningDetails,
+  InstallPolicyWarningOccurrence,
+  InstallPolicyWarningScanIdentity,
+} from "../../plugins/install-security-scan.types.js";
 import type { ManagedPluginSourceInstallRequest } from "../../plugins/management-service.js";
 
 const managementMocks = vi.hoisted(() => {
@@ -11,8 +15,8 @@ const managementMocks = vi.hoisted(() => {
     readonly code?: string;
     readonly version?: string;
     readonly warning?: string;
-    readonly installPolicyWarning?: InstallPolicyWarningDetails;
-    readonly installPolicyAcknowledgedWarnings?: InstallPolicyWarningDetails[];
+    readonly installPolicyWarning?: InstallPolicyWarningOccurrence;
+    readonly installPolicyAcknowledgedWarnings?: InstallPolicyWarningOccurrence[];
     readonly installPolicyResolvedRequest?: ManagedPluginSourceInstallRequest;
 
     constructor(
@@ -22,8 +26,8 @@ const managementMocks = vi.hoisted(() => {
         code?: string;
         version?: string;
         warning?: string;
-        installPolicyWarning?: InstallPolicyWarningDetails;
-        installPolicyAcknowledgedWarnings?: InstallPolicyWarningDetails[];
+        installPolicyWarning?: InstallPolicyWarningOccurrence;
+        installPolicyAcknowledgedWarnings?: InstallPolicyWarningOccurrence[];
         installPolicyResolvedRequest?: ManagedPluginSourceInstallRequest;
       },
     ) {
@@ -62,6 +66,19 @@ vi.mock("../../plugins/catalog-search.js", () => ({
 }));
 
 const { pluginsHandlers } = await import("./plugins.js");
+
+const packageScan: InstallPolicyWarningScanIdentity = {
+  requestKind: "plugin-archive",
+  originType: "plugin-package",
+  pluginContentType: "package",
+};
+
+function warningOccurrence(
+  warning: InstallPolicyWarningDetails,
+  scan: InstallPolicyWarningScanIdentity = packageScan,
+): InstallPolicyWarningOccurrence {
+  return { scan, warning };
+}
 
 async function callHandler(
   method: string,
@@ -359,7 +376,7 @@ describe("plugin management Gateway handlers", () => {
           source: "clawhub",
           spec: "clawhub:community/plugin@1.0.0",
         },
-        installPolicyWarning: {
+        installPolicyWarning: warningOccurrence({
           targetName: "demo-plugin",
           targetType: "plugin",
           requestMode: "install",
@@ -373,7 +390,7 @@ describe("plugin management Gateway handlers", () => {
               line: 12,
             },
           ],
-        },
+        }),
       }),
     );
 
@@ -416,12 +433,12 @@ describe("plugin management Gateway handlers", () => {
           source: "clawhub",
           spec: "clawhub:community/plugin@1.0.0",
         },
-        installPolicyWarning: {
+        installPolicyWarning: warningOccurrence({
           targetName: "demo-plugin",
           targetType: "plugin",
           requestMode: "install",
           reason: "Scanner found a different issue",
-        },
+        }),
       }),
     );
     const changed = await callHandler("plugins.install", {
@@ -444,19 +461,22 @@ describe("plugin management Gateway handlers", () => {
           },
           warnings: [
             {
-              targetName: "demo-plugin",
-              targetType: "plugin",
-              requestMode: "install",
-              reason: "Scanner found behavior that needs review",
-              findings: [
-                {
-                  ruleId: "dynamic-eval",
-                  severity: "warn",
-                  message: "Dynamic code execution",
-                  file: "index.js",
-                  line: 12,
-                },
-              ],
+              scan: packageScan,
+              warning: {
+                targetName: "demo-plugin",
+                targetType: "plugin",
+                requestMode: "install",
+                reason: "Scanner found behavior that needs review",
+                findings: [
+                  {
+                    ruleId: "dynamic-eval",
+                    severity: "warn",
+                    message: "Dynamic code execution",
+                    file: "index.js",
+                    line: 12,
+                  },
+                ],
+              },
             },
           ],
         },
@@ -490,10 +510,13 @@ describe("plugin management Gateway handlers", () => {
           },
           warnings: [
             {
-              targetName: "demo-plugin",
-              targetType: "plugin",
-              requestMode: "install",
-              reason: "Scanner found a different issue",
+              scan: packageScan,
+              warning: {
+                targetName: "demo-plugin",
+                targetType: "plugin",
+                requestMode: "install",
+                reason: "Scanner found a different issue",
+              },
             },
           ],
         },
@@ -518,12 +541,12 @@ describe("plugin management Gateway handlers", () => {
           pluginId: "diffs",
           mode: "install",
         },
-        installPolicyWarning: {
+        installPolicyWarning: warningOccurrence({
           targetName: "diffs",
           targetType: "plugin",
           requestMode: "install",
           reason: "Review required",
-        },
+        }),
       }),
     );
     const warning = await callHandler("plugins.install", {
@@ -550,15 +573,24 @@ describe("plugin management Gateway handlers", () => {
   });
 
   it("carries earlier approvals into a token for a later scan-stage warning", async () => {
-    const firstWarning: InstallPolicyWarningDetails = {
+    const warning: InstallPolicyWarningDetails = {
       targetName: "demo-plugin",
       targetType: "plugin",
       requestMode: "install",
-      reason: "Review the package warning",
+      reason: "Review this behavior",
     };
-    const secondWarning: InstallPolicyWarningDetails = {
-      ...firstWarning,
-      reason: "Review the dependency warning",
+    const firstWarning = warningOccurrence(warning);
+    const secondWarning = warningOccurrence(warning, {
+      requestKind: "plugin-archive",
+      originType: "plugin-dependency-tree",
+      pluginContentType: "dependency-tree",
+    });
+    const publicWarningDetails = {
+      installPolicyCode: "install_policy_warning_acknowledgement_required",
+      targetName: warning.targetName,
+      targetType: warning.targetType,
+      requestMode: warning.requestMode,
+      reason: warning.reason,
     };
     const resolvedRequest = {
       source: "clawhub" as const,
@@ -579,6 +611,10 @@ describe("plugin management Gateway handlers", () => {
         ?.acknowledgementToken,
       "first acknowledgement token",
     );
+    expect(first.error).toMatchObject({ details: publicWarningDetails });
+    expect((first.error as { details?: Record<string, unknown> }).details).not.toHaveProperty(
+      "scan",
+    );
 
     managementMocks.install.mockRejectedValueOnce(
       new managementMocks.ManagedPluginLifecycleError("Second warning", {
@@ -596,6 +632,10 @@ describe("plugin management Gateway handlers", () => {
       (second.error as { details?: { acknowledgementToken?: string } }).details
         ?.acknowledgementToken,
       "second acknowledgement token",
+    );
+    expect(second.error).toMatchObject({ details: publicWarningDetails });
+    expect((second.error as { details?: Record<string, unknown> }).details).not.toHaveProperty(
+      "scan",
     );
 
     managementMocks.install.mockResolvedValueOnce({
