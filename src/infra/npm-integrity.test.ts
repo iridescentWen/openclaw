@@ -57,4 +57,28 @@ describe("resolveNpmIntegrityDrift", () => {
       "Integrity drift detected for @openclaw/test@1.0.0: expected sha512-old, got sha512-new",
     );
   });
+
+  it("fails closed when a pinned resolution omits fresh integrity metadata", async () => {
+    const warn = vi.fn();
+    const onIntegrityDrift = vi.fn(async () => true);
+
+    const result = await resolveNpmIntegrityDriftWithDefaultMessage({
+      spec: "@openclaw/test@1.0.0",
+      expectedIntegrity: "sha512-reviewed",
+      resolution: {
+        resolvedSpec: "@openclaw/test@1.0.0",
+        resolvedAt: "2026-01-01T00:00:00.000Z",
+      },
+      onIntegrityDrift,
+      warn,
+    });
+
+    expect(result).toEqual({
+      error: "aborted: npm package integrity metadata missing for @openclaw/test@1.0.0",
+    });
+    expect(onIntegrityDrift).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(
+      "Integrity metadata missing for @openclaw/test@1.0.0: expected sha512-reviewed",
+    );
+  });
 });

@@ -86,6 +86,14 @@ type ResolveNpmIntegrityDriftWithDefaultMessageParams = {
 export async function resolveNpmIntegrityDriftWithDefaultMessage(
   params: ResolveNpmIntegrityDriftWithDefaultMessageParams,
 ): Promise<{ integrityDrift?: NpmIntegrityDrift; error?: string }> {
+  const expectedIntegrity = normalizeIntegrity(params.expectedIntegrity);
+  const resolvedLabel = params.resolution.resolvedSpec ?? params.spec;
+  if (expectedIntegrity && !normalizeIntegrity(params.resolution.integrity)) {
+    params.warn?.(`Integrity metadata missing for ${resolvedLabel}: expected ${expectedIntegrity}`);
+    return {
+      error: `aborted: npm package integrity metadata missing for ${resolvedLabel}`,
+    };
+  }
   const driftResult = await resolveNpmIntegrityDrift<NpmIntegrityDriftPayload>({
     spec: params.spec,
     expectedIntegrity: params.expectedIntegrity,

@@ -3606,6 +3606,28 @@ describe("installPluginFromNpmSpec", () => {
     });
   });
 
+  it("fails closed when a pinned npm retry cannot resolve fresh integrity metadata", async () => {
+    mockNpmViewMetadataResult(runCommandWithTimeoutMock, {
+      name: "@openclaw/voice-call",
+      version: "0.0.1",
+      shasum: "reviewedshasum",
+    });
+
+    const onIntegrityDrift = vi.fn(async () => true);
+    const result = await installPluginFromNpmSpec({
+      spec: "@openclaw/voice-call@0.0.1",
+      expectedIntegrity: "sha512-reviewed",
+      onIntegrityDrift,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: "aborted: npm package integrity metadata missing for @openclaw/voice-call@0.0.1",
+    });
+    expect(onIntegrityDrift).not.toHaveBeenCalled();
+    expect(runCommandWithTimeoutMock).toHaveBeenCalledTimes(1);
+  });
+
   it("classifies npm package-not-found errors with a stable error code", async () => {
     runCommandWithTimeoutMock.mockResolvedValue({
       code: 1,
