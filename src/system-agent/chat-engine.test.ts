@@ -1295,6 +1295,37 @@ describe("SystemAgentChatEngine", () => {
     expect(completed).not.toHaveProperty("wizardInputPending");
   });
 
+  it("keeps QR ownership while polling projects a subsequent prompt", async () => {
+    let settleOwner!: () => void;
+    const owner = new Promise<void>((resolve) => {
+      settleOwner = resolve;
+    });
+    const engine = createQrEngine(async (_channel, prompter) => {
+      await prompter.qrCode?.({
+        title: "Link a device",
+        message: "Scan this QR code, then continue.",
+        text: QR_TEXT,
+        dismissed: owner,
+        expiresAtMs: Date.now() + 60_000,
+      });
+      await prompter.text({ message: "Device label" });
+    });
+
+    const prompt = await engine.handle("connect telegram");
+    const qrStepId = expectDefined(prompt.step, "QR step").id;
+    await engine.answerWizard({ stepId: qrStepId });
+
+    const next = await engine.pollStep(qrStepId);
+    expect(next.step).toMatchObject({ type: "text", message: "Device label" });
+    const nextStepId = expectDefined(next.step, "text step").id;
+    expect(engine.hasPendingQrCode()).toBe(true);
+
+    settleOwner();
+    await vi.waitFor(() => expect(engine.hasPendingQrCode()).toBe(false));
+    const completed = await engine.answerWizard({ stepId: nextStepId, value: "Work laptop" });
+    expect(completed.text).toContain("telegram is configured");
+  });
+
   it("accepts the retained QR acknowledgement after owner completion", async () => {
     let settleOwner!: () => void;
     const owner = new Promise<void>((resolve) => {
