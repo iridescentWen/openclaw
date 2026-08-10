@@ -194,11 +194,14 @@ may use `--acknowledge-install-policy-warning` as explicit approval after review
 every approved warning is re-evaluated before continuing.
 The flag is consumed by the first warning in one command; a later warning
 fails closed and requires interactive review.
-Gateway-backed and automatic installs remain
-blocked on warnings because they have no operator-confirmation flow. A `block`,
-non-zero exit, timeout, invalid JSON, non-object response, missing or invalid
-protocol version or decision, or missing or empty `warn`/`block` reason always
-fails closed.
+Gateway `plugins.install` clients receive structured warning details and may
+make one explicit retry with `acknowledgeInstallPolicyWarning: true`. The first
+warning consumes that approval and is re-evaluated; a block or later warning
+stops the request before commit and returns its own details. Other
+Gateway-backed and automatic installs remain blocked on warnings because they
+have no operator-confirmation flow. A `block`, non-zero exit, timeout, invalid
+JSON, non-object response, missing or invalid protocol version or decision, or
+missing or empty `warn`/`block` reason always fails closed.
 
 OpenClaw does not execute install policy during normal Gateway startup.
 Installs and updates fail closed when policy is enabled but unavailable.

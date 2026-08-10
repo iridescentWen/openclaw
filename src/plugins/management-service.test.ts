@@ -1,5 +1,6 @@
 import { expectDefined } from "@openclaw/normalization-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { InstallPolicyWarningAcknowledgementRequest } from "./install-security-scan.types.js";
 
 const mocks = vi.hoisted(() => ({
   applyUninstall: vi.fn(),
@@ -796,6 +797,57 @@ describe("plugin management service", () => {
         onInstallPolicyWarning: expect.any(Function),
       }),
     );
+  });
+
+  it("consumes Gateway install-policy acknowledgement after one warning", async () => {
+    const warningRequest: InstallPolicyWarningAcknowledgementRequest = {
+      targetName: "diffs",
+      targetType: "plugin",
+      requestMode: "install",
+    };
+    const laterWarning = {
+      targetName: "diffs",
+      targetType: "plugin" as const,
+      requestMode: "install" as const,
+      reason: "Dependency tree requires separate review",
+      findings: [
+        {
+          ruleId: "dependency-review",
+          severity: "warn" as const,
+          message: "A dependency triggered policy",
+        },
+      ],
+    };
+    mocks.readConfig.mockResolvedValue(configSnapshot());
+    mockHostedOfficialCatalog([hostedFeedDiffsEntry]);
+    mocks.clawhubInstall.mockImplementation(
+      async (installParams: {
+        onInstallPolicyWarning?: (
+          request: InstallPolicyWarningAcknowledgementRequest,
+        ) => Promise<boolean>;
+      }) => {
+        const acknowledge = installParams.onInstallPolicyWarning;
+        if (!acknowledge) {
+          throw new Error("expected install-policy acknowledgement callback");
+        }
+        expect(await acknowledge(warningRequest)).toBe(true);
+        expect(await acknowledge(warningRequest)).toBe(false);
+        return {
+          ok: false,
+          error: "Install cancelled: the install policy warning was not approved.",
+          code: "security_scan_blocked",
+          installPolicyWarning: laterWarning,
+        };
+      },
+    );
+
+    await expect(
+      installManagedPlugin({
+        request: { source: "official", pluginId: "diffs", acknowledgeInstallPolicyWarning: true },
+        env: {},
+      }),
+    ).rejects.toMatchObject({ installPolicyWarning: laterWarning });
+    expect(mocks.persistInstall).not.toHaveBeenCalled();
   });
 
   it("removes only the newly installed managed target after persistence conflicts", async () => {
