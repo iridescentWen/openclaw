@@ -737,6 +737,7 @@ class PluginsPage extends OpenClawLightDomElement {
         text: formatUiError(error),
       });
     },
+    options: { preserveMessageWhilePending?: boolean } = {},
   ): Promise<void> {
     const scope = this.gateway.capture();
     if (!scope || !this.canMutate() || this.busy[rowKey]) {
@@ -747,7 +748,9 @@ class PluginsPage extends OpenClawLightDomElement {
     const isCurrent = () =>
       this.gateway.isCurrent(scope) && this.mutationTokens.get(rowKey) === mutationToken;
     this.setBusy(rowKey, true);
-    this.setMessage(rowKey, null);
+    if (!options.preserveMessageWhilePending) {
+      this.setMessage(rowKey, null);
+    }
     try {
       const mutation = await runPluginConfigMutation(
         this.context.runtimeConfig,
@@ -809,6 +812,9 @@ class PluginsPage extends OpenClawLightDomElement {
           kind: "error",
           text: formatUiError(error),
         });
+      },
+      {
+        preserveMessageWhilePending: request.installPolicyWarningAcknowledgement !== undefined,
       },
     );
   }

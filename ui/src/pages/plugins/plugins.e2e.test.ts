@@ -748,6 +748,10 @@ describeControlUiE2e("Control UI Plugins mocked Gateway E2E", () => {
         packageName: "@openclaw/lobster",
         installPolicyWarningAcknowledgement: "approval-token",
       });
+      const pendingRetry = review.getByRole("button", { name: "Installing…", exact: true });
+      await pendingRetry.waitFor({ state: "visible" });
+      expect(await pendingRetry.isDisabled()).toBe(true);
+      expect(await review.textContent()).toContain("Semgrep found a risky command.");
       await gateway.rejectDeferred("plugins.install", {
         code: "INVALID_REQUEST",
         message: "raw dependency policy output",
