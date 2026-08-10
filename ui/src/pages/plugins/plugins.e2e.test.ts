@@ -156,6 +156,7 @@ const installPolicyWarning = {
   targetType: "plugin",
   requestMode: "install",
   reason: "ClawScan found issues to review.",
+  acknowledgementToken: "approval-token",
   findings: [
     {
       ruleId: "semgrep-finding",
@@ -718,7 +719,7 @@ describeControlUiE2e("Control UI Plugins mocked Gateway E2E", () => {
       expect(requestParams(retry)).toEqual({
         source: "clawhub",
         packageName: "@openclaw/lobster",
-        acknowledgeInstallPolicyWarning: true,
+        installPolicyWarningAcknowledgement: "approval-token",
       });
     } finally {
       await context.close();

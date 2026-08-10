@@ -690,6 +690,7 @@ describe("renderPlugins", () => {
                 targetType: "plugin",
                 requestMode: "install",
                 reason: "ClawScan found issues to review.",
+                acknowledgementToken: "approval-token",
                 findings: [
                   {
                     ruleId: "semgrep-finding",
@@ -740,7 +741,7 @@ describe("renderPlugins", () => {
     actionButton(alert, "Install anyway")?.click();
     expect(onInstall).toHaveBeenCalledWith(key, {
       ...request,
-      acknowledgeInstallPolicyWarning: true,
+      installPolicyWarningAcknowledgement: "approval-token",
     });
   });
 

@@ -461,7 +461,7 @@ function renderRowMessage(
             @click=${() =>
               props.onInstall(key, {
                 ...request,
-                acknowledgeInstallPolicyWarning: true,
+                installPolicyWarningAcknowledgement: details.acknowledgementToken,
               })}
           >
             ${busy ? t("pluginsPage.installing") : t("pluginsPage.installAnyway")}

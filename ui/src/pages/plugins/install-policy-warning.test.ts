@@ -13,6 +13,7 @@ describe("readPluginInstallPolicyWarning", () => {
         targetType: "plugin",
         requestMode: "install",
         reason: " ClawScan found issues to review. ",
+        acknowledgementToken: " approval-token ",
         findings: [
           {
             ruleId: "semgrep-finding",
@@ -32,6 +33,7 @@ describe("readPluginInstallPolicyWarning", () => {
       targetType: "plugin",
       requestMode: "install",
       reason: "ClawScan found issues to review.",
+      acknowledgementToken: "approval-token",
       findings: [
         {
           ruleId: "semgrep-finding",
