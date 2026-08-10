@@ -389,7 +389,7 @@ function renderRowMessage(
     const findings = details.findings ?? [];
     const reviewBody =
       findings.length === 0
-        ? t("pluginsPage.policyReviewBodyUnknown")
+        ? details.reason
         : t("pluginsPage.policyReviewBodyKnown", { count: String(findings.length) });
     return html`
       <div class="plugins-row-message plugins-row-message--warning" role="alert">
@@ -405,26 +405,15 @@ function renderRowMessage(
         ${findings.length > 0
           ? html`
               <section class="plugins-policy-review__findings-panel">
-                <div class="plugins-policy-review__findings-heading">
-                  <span>${t("pluginsPage.policyReviewFindings")}</span>
-                </div>
+                <strong class="plugins-policy-review__findings-heading"
+                  >${t("pluginsPage.policyReviewFindings")}</strong
+                >
                 <ul class="plugins-policy-review__findings">
-                  ${findings.map(
-                    (finding) => html`
-                      <li>
-                        <span class="plugins-policy-review__finding-mark" aria-hidden="true"></span>
-                        <span>${finding.message}</span>
-                      </li>
-                    `,
-                  )}
+                  ${findings.map((finding) => html` <li>${finding.message}</li> `)}
                 </ul>
               </section>
             `
-          : html`
-              <section class="plugins-policy-review__findings-panel">
-                <p class="plugins-policy-review__reason">${details.reason}</p>
-              </section>
-            `}
+          : nothing}
         ${findings.length > 0
           ? html`
               <details class="plugins-policy-review__details">
@@ -434,67 +423,49 @@ function renderRowMessage(
                   >
                   <span>${t("pluginsPage.policyReviewTechnicalDetails")}</span>
                 </summary>
-                <dl>
-                  <div>
-                    <dt>${t("pluginsPage.policyReviewPolicyResponse")}</dt>
-                    <dd>${details.reason}</dd>
-                  </div>
-                  ${findings.map(
-                    (finding, index) => html`
-                      <div>
-                        <dt>${t("pluginsPage.policyReviewRule", { count: String(index + 1) })}</dt>
-                        <dd><code>${finding.ruleId}</code></dd>
-                      </div>
-                      ${finding.file
-                        ? html`
-                            <div>
-                              <dt>${t("pluginsPage.policyReviewLocation")}</dt>
-                              <dd>
-                                <code
-                                  >${finding.file}${finding.line ? `:${finding.line}` : ""}</code
-                                >
-                              </dd>
-                            </div>
-                          `
-                        : nothing}
-                      ${finding.evidence
-                        ? html`
-                            <div>
-                              <dt>${t("pluginsPage.policyReviewEvidence")}</dt>
-                              <dd>${finding.evidence}</dd>
-                            </div>
-                          `
-                        : nothing}
-                    `,
-                  )}
-                </dl>
+                <div class="plugins-policy-review__details-body">
+                  <p>${details.reason}</p>
+                  <ul>
+                    ${findings.map(
+                      (finding) => html`
+                        <li>
+                          <code>${finding.ruleId}</code>
+                          ${finding.file
+                            ? html`<code
+                                >${finding.file}${finding.line ? `:${finding.line}` : ""}</code
+                              >`
+                            : nothing}
+                          ${finding.evidence ? html`<span>${finding.evidence}</span>` : nothing}
+                        </li>
+                      `,
+                    )}
+                  </ul>
+                </div>
               </details>
             `
           : nothing}
-        <div class="plugins-policy-review__footer">
-          <div class="plugins-policy-review__actions">
-            <button
-              type="button"
-              class="btn btn--sm"
-              ?disabled=${busy}
-              @click=${() => props.onDismissMessage(key)}
-            >
-              ${t("pluginsPage.cancel")}
-            </button>
-            <button
-              type="button"
-              class="btn btn--sm danger"
-              title=${props.mutationBlockedReason ?? ""}
-              ?disabled=${busy || !props.canMutate}
-              @click=${() =>
-                props.onInstall(key, {
-                  ...request,
-                  acknowledgeInstallPolicyWarning: true,
-                })}
-            >
-              ${busy ? t("pluginsPage.installing") : t("pluginsPage.installAnyway")}
-            </button>
-          </div>
+        <div class="plugins-policy-review__actions">
+          <button
+            type="button"
+            class="btn btn--sm"
+            ?disabled=${busy}
+            @click=${() => props.onDismissMessage(key)}
+          >
+            ${t("pluginsPage.cancel")}
+          </button>
+          <button
+            type="button"
+            class="btn btn--sm danger"
+            title=${props.mutationBlockedReason ?? ""}
+            ?disabled=${busy || !props.canMutate}
+            @click=${() =>
+              props.onInstall(key, {
+                ...request,
+                acknowledgeInstallPolicyWarning: true,
+              })}
+          >
+            ${busy ? t("pluginsPage.installing") : t("pluginsPage.installAnyway")}
+          </button>
         </div>
       </div>
     `;

@@ -520,10 +520,6 @@ h3.plugins-subheader {
 }
 
 .plugins-policy-review__findings-heading {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: var(--space-2);
   color: var(--text-strong);
   font-weight: 600;
 }
@@ -544,21 +540,18 @@ h3.plugins-subheader {
   color: var(--text);
 }
 
-.plugins-policy-review__findings li + li {
-  margin-top: var(--space-2);
-}
-
-.plugins-policy-review__finding-mark {
+.plugins-policy-review__findings li::before {
   width: 7px;
   height: 7px;
   margin-top: 6px;
   border-radius: var(--radius-full);
   background: var(--warn);
+  content: "";
   justify-self: center;
 }
 
-.plugins-policy-review__reason {
-  margin: 0;
+.plugins-policy-review__findings li + li {
+  margin-top: var(--space-2);
 }
 
 .plugins-policy-review__details {
@@ -612,24 +605,30 @@ h3.plugins-subheader {
   box-shadow: var(--focus-ring);
 }
 
-.plugins-policy-review__details dl {
+.plugins-policy-review__details-body {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
   margin: var(--space-2) 0 0;
 }
 
-.plugins-policy-review__details dl > div {
-  min-width: 0;
-}
-
-.plugins-policy-review__details dt {
-  margin-bottom: 2px;
-}
-
-.plugins-policy-review__details dd {
-  overflow-wrap: anywhere;
+.plugins-policy-review__details-body p,
+.plugins-policy-review__details-body ul {
   margin: 0;
+}
+
+.plugins-policy-review__details-body ul {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.plugins-policy-review__details-body li {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  overflow-wrap: anywhere;
   color: var(--text);
 }
 
@@ -637,22 +636,17 @@ h3.plugins-subheader {
   font-size: inherit;
 }
 
-.plugins-policy-review__footer {
+.plugins-policy-review__actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: var(--space-3);
   padding: var(--space-2) 0 0 var(--plugins-policy-review-indent);
   border-top: 1px solid color-mix(in srgb, var(--warn) 20%, var(--border));
 }
 
-.plugins-policy-review__actions {
-  display: flex;
-  flex: 0 0 auto;
-  gap: var(--space-2);
-}
-
 .plugins-policy-review__actions .btn {
+  flex: 0 0 auto;
   min-height: 44px;
 }
 
@@ -913,15 +907,6 @@ h3.plugins-subheader {
 
   .plugins-row-message--warning {
     padding: var(--space-2) 0 0;
-  }
-
-  .plugins-policy-review__details dl {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .plugins-policy-review__footer {
-    align-items: stretch;
-    flex-direction: column;
   }
 
   .plugins-policy-review__actions,
