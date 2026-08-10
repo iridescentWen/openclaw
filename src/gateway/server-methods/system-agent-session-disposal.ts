@@ -11,16 +11,23 @@ type SystemAgentSession =
 function expirePendingApprovals(
   sessions: readonly SystemAgentSession[],
   approvalManager: GatewayRequestContext["systemAgentApprovalManager"],
-): void {
+): unknown[] {
+  const failures: unknown[] = [];
   // Approval records must become terminal while their owning sessions are
   // still present; otherwise a later allow decision can report success but do nothing.
   for (const session of sessions) {
     if (!session.pendingApproval) {
       continue;
     }
-    approvalManager?.expire(session.pendingApproval.id, "session-disposed");
-    session.pendingApproval = undefined;
+    try {
+      approvalManager?.expire(session.pendingApproval.id, "session-disposed");
+    } catch (error) {
+      failures.push(error);
+    } finally {
+      session.pendingApproval = undefined;
+    }
   }
+  return failures;
 }
 
 /** Retains only a removed session's commit-locked setup work across Gateway restart. */
@@ -44,13 +51,6 @@ export async function disposeSystemAgentSessionsForOwner(
   const ownedSessions = Array.from(sessions.entries()).filter(
     ([, session]) => session.ownerKey === ownerKey,
   );
-  expirePendingApprovals(
-    ownedSessions.map(([, session]) => session),
-    approvalManager,
-  );
-  for (const [sessionId] of ownedSessions) {
-    sessions.delete(sessionId);
-  }
   const persistentApplySettlements = ownedSessions
     .map(([, session]) => session.engine.getPersistentApplySettlement())
     .filter((settlement): settlement is Promise<void> => settlement !== null);
@@ -59,15 +59,22 @@ export async function disposeSystemAgentSessionsForOwner(
       Promise.allSettled(persistentApplySettlements).then(() => undefined),
     );
   }
+  const approvalFailures = expirePendingApprovals(
+    ownedSessions.map(([, session]) => session),
+    approvalManager,
+  );
+  for (const [sessionId] of ownedSessions) {
+    sessions.delete(sessionId);
+  }
   const disposal = Promise.allSettled(
     ownedSessions.map(([, session]) => session.engine.dispose()),
   ).then((results) => {
-    const failures = results.filter((result) => result.status === "rejected");
+    const failures = [
+      ...approvalFailures,
+      ...results.filter((result) => result.status === "rejected").map((failure) => failure.reason),
+    ];
     if (failures.length > 0) {
-      throw new AggregateError(
-        failures.map((failure) => failure.reason),
-        `Failed to dispose system-agent sessions for ${ownerKey}`,
-      );
+      throw new AggregateError(failures, `Failed to dispose system-agent sessions for ${ownerKey}`);
     }
   });
   await disposal;
@@ -92,8 +99,6 @@ export async function disposeSystemAgentSessions(
   // Clear ownership before awaiting disposal so no new request can rediscover
   // a generation whose engines are already releasing QR secrets and timers.
   const ownedSessions = Array.from(sessions.values());
-  expirePendingApprovals(ownedSessions, approvalManager);
-  sessions.clear();
   const persistentApplySettlements = ownedSessions
     .map((session) => session.engine.getPersistentApplySettlement())
     .filter((settlement): settlement is Promise<void> => settlement !== null);
@@ -103,15 +108,19 @@ export async function disposeSystemAgentSessions(
     ...persistentApplySettlements,
   ]).then(() => undefined);
   retainRetiredSystemAgentMutationSettlement(mutationSettlement);
+  // Expiration persists durable state and may fail. Retain the mutation fence first,
+  // then keep cleanup progressing so replacement work cannot overlap this generation.
+  const approvalFailures = expirePendingApprovals(ownedSessions, approvalManager);
+  sessions.clear();
   const results = await Promise.allSettled([
     mutationSettlement,
     ...ownedSessions.map((session) => session.engine.dispose()),
   ]);
-  const failures = results.filter((result) => result.status === "rejected");
+  const failures = [
+    ...approvalFailures,
+    ...results.filter((result) => result.status === "rejected").map((failure) => failure.reason),
+  ];
   if (failures.length > 0) {
-    throw new AggregateError(
-      failures.map((failure) => failure.reason),
-      "Failed to dispose system-agent sessions",
-    );
+    throw new AggregateError(failures, "Failed to dispose system-agent sessions");
   }
 }

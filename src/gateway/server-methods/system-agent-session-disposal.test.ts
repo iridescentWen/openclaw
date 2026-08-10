@@ -201,6 +201,43 @@ describe("disposeSystemAgentSessions", () => {
     expect(sessions.size).toBe(0);
   });
 
+  it("retains the restart fence and disposes sessions when approval expiry fails", async () => {
+    const releaseMutation = createDeferred();
+    const dispose = vi.fn(async () => {});
+    const sessions = new Map<string, SystemAgentChatSession>([
+      [
+        "global",
+        sessionWithDispose(dispose, releaseMutation.promise, "device:test", {
+          id: "approval-global",
+          proposalHash: "proposal-global",
+        }),
+      ],
+    ]);
+    const approvalFailure = new Error("approval store failed");
+    const expiration = { expire: vi.fn(() => void 0) };
+    expiration.expire.mockImplementationOnce(() => {
+      expect(sessions.has("global")).toBe(true);
+      throw approvalFailure;
+    });
+
+    const disposal = disposeSystemAgentSessions(sessions, new Map(), expiration as never);
+    const rejection = expect(disposal).rejects.toMatchObject({
+      name: "AggregateError",
+      errors: [approvalFailure],
+    });
+    const replacementTask = vi.fn(async () => "replacement");
+    const replacement = runSystemAgentGatewayTask(replacementTask, new Map());
+    await waitForTaskAdmission();
+
+    expect(sessions.size).toBe(0);
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(replacementTask).not.toHaveBeenCalled();
+
+    releaseMutation.resolve();
+    await rejection;
+    await expect(replacement).resolves.toBe("replacement");
+  });
+
   it("rejects a wizard start admitted after shutdown retirement", async () => {
     const sessions = new Map<string, SystemAgentChatSession>();
     const wizardSessions = new Map();
