@@ -294,6 +294,7 @@ describe("legacy file install scan compatibility", () => {
       targetType: "plugin",
       requestMode: "install",
     });
+    expect(onInstallPolicyWarning).toHaveBeenCalledTimes(1);
     expect(runInstallPolicyMock).toHaveBeenCalledTimes(2);
   });
 
