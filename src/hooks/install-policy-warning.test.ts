@@ -22,7 +22,7 @@ describe("hook install policy warnings", () => {
     fs.mkdirSync(source);
     fs.writeFileSync(path.join(source, "HOOK.md"), "---\nname: my-hook\n---\n");
     fs.writeFileSync(path.join(source, "handler.ts"), "export default async () => {};\n");
-    const onInstallPolicyWarning = vi.fn().mockResolvedValue(true);
+    const onInstallPolicyWarning = vi.fn().mockResolvedValue({ status: "approved" });
 
     await installHooksFromPath({
       path: source,

@@ -1773,7 +1773,7 @@ describe("installPluginFromClawHub", () => {
   });
 
   it("passes install policy acknowledgement through to archive installs", async () => {
-    const onInstallPolicyWarning = vi.fn().mockResolvedValue(true);
+    const onInstallPolicyWarning = vi.fn().mockResolvedValue({ status: "approved" });
 
     await installPluginFromClawHub({
       spec: "clawhub:demo",

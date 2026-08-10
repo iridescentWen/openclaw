@@ -1492,14 +1492,14 @@ describe("plugins cli update", () => {
         targetType: "plugin",
         requestMode: "update",
       }),
-    ).resolves.toBe(true);
+    ).resolves.toEqual({ status: "approved" });
     await expect(
       pluginAcknowledgement({
         targetName: "demo-hooks",
         targetType: "plugin",
         requestMode: "update",
       }),
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ status: "unavailable", reason: "approval-exhausted" });
   });
 
   it("writes updated config when updater reports changes", async () => {

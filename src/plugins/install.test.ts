@@ -2284,7 +2284,7 @@ describe("installPluginFromNpmSpec", () => {
       ]),
     });
     mockSuccessfulManagedNpmInstall({ packageName, version: "1.2.3" });
-    const onInstallPolicyWarning = vi.fn().mockResolvedValue(true);
+    const onInstallPolicyWarning = vi.fn().mockResolvedValue({ status: "approved" });
     const scanSpy = vi.spyOn(installSecurityScan, "scanPackageInstallSource");
     const captured = captureSecurityEvents();
     let policyAcknowledgementForwarded = false;

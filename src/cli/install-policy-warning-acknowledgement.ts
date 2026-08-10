@@ -25,10 +25,10 @@ export function resolveInstallPolicyWarningAcknowledgementCliOptions(params: {
       ? {
           onInstallPolicyWarning: async () => {
             if (!explicitAcknowledgementAvailable) {
-              return false;
+              return { status: "unavailable", reason: "approval-exhausted" };
             }
             explicitAcknowledgementAvailable = false;
-            return true;
+            return { status: "approved" };
           },
         }
       : canPrompt
@@ -38,7 +38,7 @@ export function resolveInstallPolicyWarningAcknowledgementCliOptions(params: {
               const answer = await promptText(
                 `type: '${targetName}' to ${request.requestMode} anyway\n> `,
               );
-              return answer.trim() === targetName;
+              return answer.trim() === targetName ? { status: "approved" } : { status: "declined" };
             },
           }
         : {}),

@@ -760,12 +760,12 @@ async function runOperatorInstallPolicy(params: {
     };
   }
   logPolicyResult(result);
-  const acknowledged = await params.onInstallPolicyWarning({
+  const acknowledgement = await params.onInstallPolicyWarning({
     targetName: params.targetName,
     targetType: params.targetType,
     requestMode: params.requestMode,
   });
-  if (acknowledged) {
+  if (acknowledgement.status === "approved") {
     const reevaluated = await evaluatePolicy();
     if (reevaluated?.blocked) {
       return formatBlockedInstallPolicyResult({
@@ -801,6 +801,24 @@ async function runOperatorInstallPolicy(params: {
       logPolicyResult(reevaluated);
     }
     return undefined;
+  }
+  if (acknowledgement.status === "unavailable") {
+    return {
+      blocked: {
+        code: "security_scan_blocked",
+        reason: formatInstallPolicyNotice({
+          decision: "warn",
+          findings: result.findings,
+          guidance: [
+            "The noninteractive approval was already used.",
+            "Review this warning and rerun interactively.",
+          ],
+          reason: result.warning.reason,
+          targetName: params.targetName,
+          targetType: params.targetType,
+        }),
+      },
+    };
   }
   return {
     blocked: {

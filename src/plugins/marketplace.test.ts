@@ -535,7 +535,7 @@ describe("marketplace plugins", () => {
         version: "0.1.0",
         extensions: ["index.ts"],
       });
-      const onInstallPolicyWarning = vi.fn().mockResolvedValue(true);
+      const onInstallPolicyWarning = vi.fn().mockResolvedValue({ status: "approved" });
 
       await installPluginFromMarketplace({
         marketplace: manifestPath,

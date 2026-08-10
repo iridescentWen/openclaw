@@ -1649,14 +1649,14 @@ describe("plugins cli install", () => {
         targetType: "plugin",
         requestMode: "install",
       }),
-    ).resolves.toBe(true);
+    ).resolves.toEqual({ status: "approved" });
     await expect(
       acknowledgement({
         targetName: "demo-dependency",
         targetType: "plugin",
         requestMode: "install",
       }),
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ status: "unavailable", reason: "approval-exhausted" });
   });
 
   it("does not report a ClawHub install when durable persistence fails", async () => {

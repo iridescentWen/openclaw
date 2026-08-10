@@ -323,7 +323,7 @@ describe("package dependency boundaries", () => {
 
 describe("legacy file install scan compatibility", () => {
   it("continues after one acknowledgement and a fresh evaluation of the same warning", async () => {
-    const onInstallPolicyWarning = vi.fn().mockResolvedValue(true);
+    const onInstallPolicyWarning = vi.fn().mockResolvedValue({ status: "approved" });
     runInstallPolicyMock
       .mockResolvedValueOnce({ warning: { reason: "review this plugin" } })
       .mockResolvedValueOnce({ warning: { reason: "review this plugin" } });
@@ -345,7 +345,7 @@ describe("legacy file install scan compatibility", () => {
   });
 
   it("requires approval again when policy re-evaluation returns a changed warning", async () => {
-    const onInstallPolicyWarning = vi.fn().mockResolvedValue(true);
+    const onInstallPolicyWarning = vi.fn().mockResolvedValue({ status: "approved" });
     runInstallPolicyMock
       .mockResolvedValueOnce({ warning: { reason: "review this plugin" } })
       .mockResolvedValueOnce({
@@ -386,7 +386,7 @@ describe("legacy file install scan compatibility", () => {
     const result = await scanFileInstallSourceRuntime({
       filePath: "/tmp/payload.js",
       logger: {},
-      onInstallPolicyWarning: vi.fn().mockResolvedValue(true),
+      onInstallPolicyWarning: vi.fn().mockResolvedValue({ status: "approved" }),
       pluginId: "payload",
     });
 
@@ -432,12 +432,42 @@ describe("legacy file install scan compatibility", () => {
     const result = await scanFileInstallSourceRuntime({
       filePath: "/tmp/payload.js",
       logger: {},
-      onInstallPolicyWarning: vi.fn().mockResolvedValue(true),
+      onInstallPolicyWarning: vi.fn().mockResolvedValue({ status: "approved" }),
       pluginId: "payload",
     });
 
     expect(result?.blocked).toEqual({ code: "security_scan_blocked", reason: "now blocked" });
     expect(runInstallPolicyMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("distinguishes an exhausted noninteractive approval from cancellation", async () => {
+    runInstallPolicyMock.mockResolvedValue({
+      warning: { reason: "review the dependency warning" },
+      findings: [
+        {
+          ruleId: "dependency-warning",
+          severity: "warn",
+          message: "Review the dependency tree.",
+        },
+      ],
+    });
+
+    const result = await scanFileInstallSourceRuntime({
+      filePath: "/tmp/payload.js",
+      logger: {},
+      onInstallPolicyWarning: vi.fn().mockResolvedValue({
+        status: "unavailable",
+        reason: "approval-exhausted",
+      }),
+      pluginId: "payload",
+    });
+
+    expect(result?.blocked?.reason).toContain("Reason: review the dependency warning");
+    expect(result?.blocked?.reason).toContain("Review the dependency tree.");
+    expect(result?.blocked?.reason).toContain("The noninteractive approval was already used.");
+    expect(result?.blocked?.reason).toContain("Review this warning and rerun interactively.");
+    expect(result?.blocked?.reason).not.toContain("Install cancelled");
+    expect(runInstallPolicyMock).toHaveBeenCalledTimes(1);
   });
 
   it("renders warning details as one readable review notice", async () => {
@@ -450,7 +480,7 @@ describe("legacy file install scan compatibility", () => {
     await scanFileInstallSourceRuntime({
       filePath: "/tmp/payload.js",
       logger: { warn: (message) => warnings.push(message) },
-      onInstallPolicyWarning: vi.fn().mockResolvedValue(false),
+      onInstallPolicyWarning: vi.fn().mockResolvedValue({ status: "declined" }),
       pluginId: "payload",
     });
 

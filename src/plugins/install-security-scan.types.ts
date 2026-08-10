@@ -7,12 +7,20 @@ export type InstallPolicyWarningAcknowledgementRequest = {
   requestMode: "install" | "update";
 };
 
+export type InstallPolicyWarningAcknowledgementResult =
+  | { status: "approved" }
+  | { status: "declined" }
+  | {
+      status: "unavailable";
+      reason: "approval-exhausted";
+    };
+
 /** Overrides that intentionally loosen install safety policy for trusted/operator paths. */
 export type InstallSafetyOverrides = {
   config?: OpenClawConfig;
   dangerouslyForceUnsafeInstall?: boolean;
   onInstallPolicyWarning?: (
     request: InstallPolicyWarningAcknowledgementRequest,
-  ) => Promise<boolean>;
+  ) => Promise<InstallPolicyWarningAcknowledgementResult>;
   trustedSourceLinkedOfficialInstall?: boolean;
 };

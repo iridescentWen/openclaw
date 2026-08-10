@@ -48,7 +48,7 @@ describe("resolveInstallPolicyWarningAcknowledgementCliOptions", () => {
         targetType: "plugin",
         requestMode: fixture.requestMode,
       }),
-    ).resolves.toBe(true);
+    ).resolves.toEqual({ status: "approved" });
 
     expect(promptTextMock).toHaveBeenCalledWith(
       `type: 'demo\\npkg' to ${fixture.action} anyway\n> `,
@@ -67,7 +67,7 @@ describe("resolveInstallPolicyWarningAcknowledgementCliOptions", () => {
         targetType: "skill",
         requestMode: "install",
       }),
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ status: "declined" });
   });
 
   it("does not prompt outside a TTY", () => {
@@ -97,14 +97,14 @@ describe("resolveInstallPolicyWarningAcknowledgementCliOptions", () => {
         targetType: "plugin",
         requestMode: "install",
       }),
-    ).resolves.toBe(true);
+    ).resolves.toEqual({ status: "approved" });
     await expect(
       options.onInstallPolicyWarning?.({
         targetName: "demo-dependency",
         targetType: "plugin",
         requestMode: "install",
       }),
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ status: "unavailable", reason: "approval-exhausted" });
     expect(promptTextMock).not.toHaveBeenCalled();
   });
 });
