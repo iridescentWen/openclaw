@@ -2764,6 +2764,7 @@ export const en: TranslationMap = {
     defaultRiskWarning: "Review the ClawHub warning before installing this plugin.",
     policyReviewTitle: "Security review needed",
     policyReviewBodyKnown: "Policy warnings: {count}. Not installed.",
+    policyReviewBodyReason: "{reason} Not installed.",
     policyReviewFindings: "Findings",
     policyReviewSeverityInfo: "Info",
     policyReviewSeverityWarn: "Warning",

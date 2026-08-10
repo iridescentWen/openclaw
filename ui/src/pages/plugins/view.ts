@@ -404,7 +404,7 @@ function renderRowMessage(
     const findings = details.findings ?? [];
     const reviewBody =
       findings.length === 0
-        ? details.reason
+        ? t("pluginsPage.policyReviewBodyReason", { reason: details.reason })
         : t("pluginsPage.policyReviewBodyKnown", { count: String(findings.length) });
     return html`
       <div

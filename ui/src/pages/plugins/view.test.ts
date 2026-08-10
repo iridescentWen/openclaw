@@ -760,6 +760,47 @@ describe("renderPlugins", () => {
     });
   });
 
+  it("keeps the not-installed outcome visible for reason-only policy warnings", () => {
+    const plugin = createPlugin({
+      id: "reason-only",
+      name: "Reason Only",
+      installed: false,
+      enabled: false,
+      state: "disabled",
+      install: { source: "official", pluginId: "reason-only" },
+    });
+    const key = pluginRowKey(plugin.id);
+    const container = mount(
+      createProps({
+        activeTab: "discover",
+        result: createResult([plugin]),
+        messages: {
+          [key]: {
+            kind: "warning",
+            text: "Review this package source.",
+            installPolicyWarning: {
+              request: { source: "official", pluginId: "reason-only" },
+              details: {
+                installPolicyCode: "install_policy_warning_acknowledgement_required",
+                targetName: "reason-only",
+                targetType: "plugin",
+                requestMode: "install",
+                reason: "Review this package source.",
+                acknowledgementToken: "reason-only-token",
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    const alert = expectDefined(
+      container.querySelector('[data-plugin-id="reason-only"] [role="alert"]'),
+      "reason-only install policy warning",
+    );
+    expect(normalizedText(alert)).toContain("Review this package source. Not installed.");
+  });
+
   it("correlates installed ClawHub packages without a search runtime id", () => {
     const packageName = "@community/calendar-plus";
     const installed = createPlugin({
