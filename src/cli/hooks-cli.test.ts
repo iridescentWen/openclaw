@@ -258,6 +258,7 @@ describe("hooks cli formatting", () => {
 
     expect(runPluginInstallCommandMock).toHaveBeenCalledWith({
       raw: "npm:demo-hooks",
+      allowInstallPolicyWarningPrompt: true,
       opts: expect.objectContaining({ force: true }),
       invalidateRuntimeCache: false,
     });
@@ -275,6 +276,7 @@ describe("hooks cli formatting", () => {
 
     expect(runPluginInstallCommandMock).toHaveBeenCalledWith({
       raw: "npm:demo-hooks",
+      allowInstallPolicyWarningPrompt: true,
       opts: expect.objectContaining({ acknowledgeInstallPolicyWarning: true }),
       invalidateRuntimeCache: false,
     });

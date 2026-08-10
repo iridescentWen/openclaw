@@ -92,6 +92,7 @@ async function runPluginInstallCommandUnlocked(
     config: snapshot.config,
     ...resolveInstallPolicyWarningAcknowledgementCliOptions({
       acknowledgeInstallPolicyWarning: opts.acknowledgeInstallPolicyWarning,
+      allowPrompt: params.allowInstallPolicyWarningPrompt,
       dangerouslyForceUnsafeInstall: opts.dangerouslyForceUnsafeInstall,
     }),
   });

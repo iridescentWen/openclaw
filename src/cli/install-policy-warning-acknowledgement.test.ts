@@ -75,6 +75,14 @@ describe("resolveInstallPolicyWarningAcknowledgementCliOptions", () => {
     expect(resolveInstallPolicyWarningAcknowledgementCliOptions({})).toEqual({});
   });
 
+  it("does not infer prompt authority from an attached TTY", () => {
+    setTty(true);
+    expect(resolveInstallPolicyWarningAcknowledgementCliOptions({ allowPrompt: false })).toEqual(
+      {},
+    );
+    expect(promptTextMock).not.toHaveBeenCalled();
+  });
+
   it("keeps the deprecated unsafe flag inert without suppressing an interactive prompt", () => {
     setTty(true);
     const options = resolveInstallPolicyWarningAcknowledgementCliOptions({
