@@ -196,8 +196,10 @@ The flag is consumed by the first warning in one command; a later warning
 fails closed and requires interactive review.
 Gateway `plugins.install` clients receive structured warning details and may
 make one explicit retry with `acknowledgeInstallPolicyWarning: true`. The first
-warning consumes that approval and is re-evaluated; a block or later warning
-stops the request before commit and returns its own details. Other
+warning consumes that approval. OpenClaw evaluates that same staged scan again
+before allowing the acknowledged warning to continue. A block from that
+evaluation, or a warning from any later package or dependency scan, stops the
+request before commit and returns its own details. Other
 Gateway-backed and automatic installs remain blocked on warnings because they
 have no operator-confirmation flow. A `block`, non-zero exit, timeout, invalid
 JSON, non-object response, missing or invalid protocol version or decision, or
