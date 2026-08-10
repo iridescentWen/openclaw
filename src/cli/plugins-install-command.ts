@@ -1,4 +1,5 @@
 // Executes validated plugin, marketplace, ClawHub, and hook-pack install requests.
+import { theme } from "../../packages/terminal-core/src/theme.js";
 import { assertConfigWriteAllowedInCurrentMode } from "../config/config.js";
 import { reportClawHubPluginInstallTelemetry } from "../infra/clawhub-packages.js";
 import { parseClawHubPluginSpec } from "../infra/clawhub-spec.js";
@@ -41,6 +42,9 @@ import {
   type RunPluginInstallCommandParams,
 } from "./plugins-install-preflight.js";
 
+const DEPRECATED_DANGEROUS_FORCE_UNSAFE_INSTALL_WARNING =
+  "--dangerously-force-unsafe-install is deprecated and no longer affects plugin installs because built-in install-time dangerous-code scanning has been removed. Configure security.installPolicy for operator-owned install decisions.";
+
 function isClawHubBlockedCliFailure(result: { code?: string; warning?: string }): boolean {
   return (
     result.code === CLAWHUB_INSTALL_ERROR_CODE.CLAWHUB_DOWNLOAD_BLOCKED &&
@@ -73,6 +77,9 @@ async function runPluginInstallCommandUnlocked(
   const runtime = params.runtime ?? defaultRuntime;
   const invalidateRuntimeCache = params.invalidateRuntimeCache ?? true;
   const { raw, opts, installMode, request } = preflight;
+  if (opts.dangerouslyForceUnsafeInstall) {
+    runtime.log(theme.warn(DEPRECATED_DANGEROUS_FORCE_UNSAFE_INSTALL_WARNING));
+  }
   const snapshot = await loadConfigForInstall(request).catch((error: unknown) => {
     runtime.error(formatErrorMessage(error));
     return null;

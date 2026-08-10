@@ -2192,6 +2192,13 @@ describe("plugins cli install", () => {
     expect(npmInstallCall().spec).toBe("demo");
     expect(npmInstallCall().mode).toBe("update");
     expect(npmInstallCall().dangerouslyForceUnsafeInstall).toBe(true);
+    expect(
+      runtimeLogs.filter((message) =>
+        message.includes(
+          "--dangerously-force-unsafe-install is deprecated and no longer affects plugin installs",
+        ),
+      ),
+    ).toHaveLength(1);
     expect(installPluginFromClawHub).not.toHaveBeenCalled();
   });
 

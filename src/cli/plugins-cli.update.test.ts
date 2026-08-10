@@ -1248,12 +1248,12 @@ describe("plugins cli update", () => {
     expect(updateParams.pluginIds).toEqual(["openclaw-codex-app-server"]);
     expect(updateParams.dangerouslyForceUnsafeInstall).toBe(true);
     expect(
-      pluginsCliRuntimeLogs.some((message) =>
+      pluginsCliRuntimeLogs.filter((message) =>
         message.includes(
           "--dangerously-force-unsafe-install is deprecated and no longer affects plugin updates",
         ),
       ),
-    ).toBe(true);
+    ).toHaveLength(1);
   });
 
   it.each([
