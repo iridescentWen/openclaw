@@ -1,6 +1,10 @@
 import { expectDefined } from "@openclaw/normalization-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { InstallPolicyWarningOccurrence } from "./install-security-scan.types.js";
+import type {
+  InstallPolicyWarningAcknowledgementRequest,
+  InstallPolicyWarningAcknowledgementResult,
+  InstallPolicyWarningOccurrence,
+} from "./install-security-scan.types.js";
 import {
   expectOneShotInstallPolicyWarningAcknowledgement,
   officialDiffsWarningRequest,
@@ -239,17 +243,32 @@ describe("plugin management install-policy acknowledgements", () => {
     const acknowledge = expectDefined(
       (
         call[0] as {
-          onInstallPolicyWarning?: (request: {
-            scan: typeof packageWarning.scan;
-            warning: typeof packageWarning.warning;
-          }) => Promise<boolean>;
+          onInstallPolicyWarning?: (
+            request: InstallPolicyWarningAcknowledgementRequest,
+          ) => Promise<InstallPolicyWarningAcknowledgementResult>;
         }
       ).onInstallPolicyWarning,
       "install-policy acknowledgement callback",
     );
-    expect(await acknowledge(dependencyWarning)).toBe(false);
-    expect(await acknowledge(packageWarning)).toBe(true);
-    expect(await acknowledge(packageWarning)).toBe(false);
+    expect(
+      await acknowledge({
+        targetName: dependencyWarning.warning.targetName,
+        targetType: dependencyWarning.warning.targetType,
+        requestMode: dependencyWarning.warning.requestMode,
+        ...dependencyWarning,
+      }),
+    ).toEqual({ status: "unavailable", reason: "warning-not-approved" });
+    const packageRequest: InstallPolicyWarningAcknowledgementRequest = {
+      targetName: packageWarning.warning.targetName,
+      targetType: packageWarning.warning.targetType,
+      requestMode: packageWarning.warning.requestMode,
+      ...packageWarning,
+    };
+    expect(await acknowledge(packageRequest)).toEqual({ status: "approved" });
+    expect(await acknowledge(packageRequest)).toEqual({
+      status: "unavailable",
+      reason: "warning-not-approved",
+    });
   });
 
   it("pins reviewed npm warnings to the first resolved version and integrity", async () => {

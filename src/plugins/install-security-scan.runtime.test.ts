@@ -501,6 +501,19 @@ describe("legacy file install scan compatibility", () => {
     expect(result?.blocked?.reason).toContain("The noninteractive approval was already used.");
     expect(result?.blocked?.reason).toContain("Review this warning and rerun interactively.");
     expect(result?.blocked?.reason).not.toContain("Install cancelled");
+    expect(result?.blocked?.installPolicyWarning).toMatchObject({
+      scan: {
+        requestKind: "plugin-file",
+        originType: "plugin-file",
+        pluginContentType: "file",
+      },
+      warning: {
+        targetName: "payload",
+        targetType: "plugin",
+        requestMode: "install",
+        reason: "review the dependency warning",
+      },
+    });
     expect(runInstallPolicyMock).toHaveBeenCalledTimes(1);
   });
 

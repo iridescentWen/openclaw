@@ -1540,13 +1540,13 @@ export async function installManagedPlugin(params: {
                     isDeepStrictEqual(warning, approved.warning),
                 );
                 if (warningIndex < 0) {
-                  return false;
+                  return { status: "unavailable", reason: "warning-not-approved" };
                 }
                 const [approved] = remainingInstallPolicyWarnings.splice(warningIndex, 1);
                 if (approved) {
                   acknowledgedInstallPolicyWarnings.push(approved);
                 }
-                return true;
+                return { status: "approved" };
               },
             },
           }

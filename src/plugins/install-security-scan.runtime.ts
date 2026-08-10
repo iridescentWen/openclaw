@@ -1104,13 +1104,17 @@ async function runOperatorInstallPolicy(params: {
     return {
       blocked: {
         code: "security_scan_blocked",
+        installPolicyWarning: warningOccurrence,
         reason: formatInstallPolicyNotice({
           decision: "warn",
           findings: result.findings,
-          guidance: [
-            "The noninteractive approval was already used.",
-            "Review this warning and rerun interactively.",
-          ],
+          guidance:
+            acknowledgement.reason === "approval-exhausted"
+              ? [
+                  "The noninteractive approval was already used.",
+                  "Review this warning and rerun interactively.",
+                ]
+              : ["This warning has not been approved.", "Review it and try again."],
           reason: result.warning.reason,
           targetName: params.targetName,
           targetType: params.targetType,
