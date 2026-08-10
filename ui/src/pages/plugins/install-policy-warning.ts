@@ -1,5 +1,7 @@
-import type { InstallPolicyWarningErrorDetails } from "../../../../packages/gateway-protocol/src/install-policy-warning-error-details.js";
-import { readInstallPolicyWarningErrorDetails } from "../../../../src/gateway/install-policy-warning-error-details.js";
+import {
+  type InstallPolicyWarningErrorDetails,
+  readInstallPolicyWarningErrorDetails,
+} from "../../../../packages/gateway-protocol/src/install-policy-warning-error-details.js";
 import { GatewayRequestError } from "../../api/gateway.ts";
 
 export type PluginInstallPolicyWarningDetails = InstallPolicyWarningErrorDetails;
