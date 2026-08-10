@@ -375,7 +375,7 @@ export class CustodianSessionStore {
     const client = this.activeClient;
     if (
       !step ||
-      !this.wizardInputPending ||
+      (!this.wizardInputPending && !(this.wizardSettling && step.type === "qr")) ||
       !client ||
       !this.chatAvailable ||
       !this.wizardCancelAvailable ||
@@ -385,12 +385,22 @@ export class CustodianSessionStore {
       this.emit();
       return;
     }
+    const sessionContinuity = this.sessionContinuity;
+    const settleQrCancellation =
+      step.type === "qr"
+        ? this.qrScheduler.beginAcknowledgement(
+            client,
+            step.id,
+            () => this.sessionContinuity === sessionContinuity && this.activeClient === client,
+          )
+        : undefined;
     void this.sendUserTurn(
       client,
       { sessionId: this.sessionId, wizardCancel: { stepId: step.id } },
       t("custodian.cancel"),
       true,
-    );
+      () => settleQrCancellation?.("sent"),
+    ).then(settleQrCancellation);
   }
 
   exitSetup(): void {
@@ -401,6 +411,8 @@ export class CustodianSessionStore {
   }
 
   private revokeNavigationAuthority(): void {
+    this.qrScheduler.clear();
+    this.messages = scrubCustodianQrSteps(this.messages);
     this.requestAbort?.abort();
     this.requestAbort = null;
     this.requestEpoch += 1;

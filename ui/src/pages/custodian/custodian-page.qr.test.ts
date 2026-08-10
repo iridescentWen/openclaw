@@ -88,6 +88,52 @@ describe("custodian QR wizard step", () => {
     await waitForFast(() => expect(page.textContent).toContain("Signal setup cancelled."));
   });
 
+  it("pauses QR polling while direct wizard cancellation settles", async () => {
+    vi.useFakeTimers();
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(qrResult())
+      .mockResolvedValueOnce(terminalResult("Signal setup cancelled."));
+    const { page } = await mountPage(createContext(request).context);
+    await vi.advanceTimersByTimeAsync(0);
+
+    page.querySelector<HTMLButtonElement>(".custodian__wizard-cancel")?.click();
+    await vi.advanceTimersByTimeAsync(2_000);
+    await page.updateComplete;
+
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls[1]?.[1]).toEqual({
+      sessionId: SESSION_ID,
+      wizardCancel: { stepId: "qr-step" },
+    });
+    expect(page.textContent).toContain("Signal setup cancelled.");
+  });
+
+  it.each([
+    ["exit setup", (page: Awaited<ReturnType<typeof mountPage>>["page"]) => page.store.exitSetup()],
+    [
+      "open model setup",
+      (page: Awaited<ReturnType<typeof mountPage>>["page"]) => page.store.openModelSetup(),
+    ],
+    [
+      "open channels",
+      (page: Awaited<ReturnType<typeof mountPage>>["page"]) =>
+        page.store.openChannelsFromOnboarding(),
+    ],
+  ])("stops QR polling and scrubs image bytes when users %s", async (_name, navigate) => {
+    vi.useFakeTimers();
+    const request = vi.fn().mockResolvedValueOnce(qrResult());
+    const { page } = await mountPage(createContext(request).context);
+    await vi.advanceTimersByTimeAsync(0);
+
+    navigate(page);
+    await vi.advanceTimersByTimeAsync(2_000);
+    await page.updateComplete;
+
+    expect(request).toHaveBeenCalledOnce();
+    expect(page.store.messages.some((message) => message.step?.qrDataUrl)).toBe(false);
+  });
+
   it("keeps polling when acknowledgement advances directly to another QR", async () => {
     vi.useFakeTimers();
     const request = vi
