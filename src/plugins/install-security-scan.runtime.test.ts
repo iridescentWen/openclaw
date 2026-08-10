@@ -324,6 +324,19 @@ describe("legacy file install scan compatibility", () => {
 
     expect(result?.blocked).toMatchObject({
       code: "security_scan_blocked",
+      installPolicyWarning: {
+        targetName: "payload",
+        targetType: "plugin",
+        requestMode: "install",
+        reason: "review the new finding",
+        findings: [
+          {
+            ruleId: "changed-warning",
+            severity: "warn",
+            message: "new finding",
+          },
+        ],
+      },
     });
     expect(result?.blocked?.reason).toContain("Reason: review the new finding");
     expect(result?.blocked?.reason).toContain("new finding");
