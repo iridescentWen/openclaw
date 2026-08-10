@@ -158,7 +158,8 @@ Gateway can bind the request to an immutable resolved artifact, and may make
 one explicit retry with the returned `acknowledgementToken` as
 `installPolicyWarningAcknowledgement`. The Gateway consumes that server-issued
 token once and only for the same install request and resolved artifact. OpenClaw
-re-evaluates the staged source and continues only when the warning is unchanged.
+re-evaluates the staged source and continues when that fresh evaluation allows
+the install or repeats the unchanged warning the operator approved.
 A changed or later warning stops the request before commit and receives a fresh
 token when the artifact remains immutably resolved. A block or a warning without
 immutable resolution metadata is terminal and has no acknowledgement token.
