@@ -5,9 +5,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   InstallPolicyWarningDetails,
   InstallPolicyWarningOccurrence,
-  InstallPolicyWarningScanIdentity,
 } from "../../plugins/install-security-scan.types.js";
 import type { ManagedPluginSourceInstallRequest } from "../../plugins/management-service.js";
+
+type InstallPolicyWarningScanIdentity = InstallPolicyWarningOccurrence["scan"];
 
 const managementMocks = vi.hoisted(() => {
   class ManagedPluginLifecycleError extends Error {
