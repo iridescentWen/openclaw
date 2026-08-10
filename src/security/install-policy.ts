@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 // Checks install policy constraints for package and plugin operations.
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -122,7 +123,7 @@ type InstallPolicyResult =
   | { blocked?: undefined; warning?: undefined; findings?: InstallPolicyFinding[] }
   | {
       blocked?: undefined;
-      warning: { reason: string };
+      warning: { reason: string; fingerprint: string };
       findings?: InstallPolicyFinding[];
     }
   | {
@@ -359,11 +360,7 @@ const installPolicyResponseEnvelopeSchema = z.object({
 
 const installPolicyReasonSchema = z.string().trim().min(1);
 
-const findingTextSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .transform((value) => truncateText(value, MAX_FINDING_TEXT_CHARS));
+const findingTextSchema = z.string().trim().min(1);
 
 const optionalFindingTextSchema = findingTextSchema.optional().catch(undefined);
 
@@ -418,13 +415,6 @@ function blockedByPolicy(reason: string, findings?: InstallPolicyFinding[]): Ins
       reason: `blocked by install policy: ${truncateText(reason, MAX_REASON_CHARS)}`,
     },
     ...(findings && findings.length > 0 ? { findings } : {}),
-  };
-}
-
-function warnedByPolicy(reason: string, findings?: InstallPolicyFinding[]): InstallPolicyResult {
-  return {
-    warning: { reason: truncateText(reason, MAX_REASON_CHARS) },
-    ...(findings?.length ? { findings } : {}),
   };
 }
 
@@ -527,6 +517,25 @@ function normalizeFinding(value: unknown): InstallPolicyFinding | null {
   return parsed.success ? parsed.data : null;
 }
 
+function truncateFinding(finding: InstallPolicyFinding): InstallPolicyFinding {
+  return {
+    ruleId: truncateText(finding.ruleId, MAX_FINDING_TEXT_CHARS),
+    severity: finding.severity,
+    message: truncateText(finding.message, MAX_FINDING_TEXT_CHARS),
+    ...(finding.file ? { file: truncateText(finding.file, MAX_FINDING_TEXT_CHARS) } : {}),
+    ...(finding.line !== undefined ? { line: finding.line } : {}),
+    ...(finding.evidence
+      ? { evidence: truncateText(finding.evidence, MAX_FINDING_TEXT_CHARS) }
+      : {}),
+  };
+}
+
+function fingerprintWarning(reason: string, findings: InstallPolicyFinding[]): string {
+  // Presentation is truncated and capped; approval must bind the complete
+  // validated warning so hidden suffix or overflow changes still fail closed.
+  return createHash("sha256").update(JSON.stringify({ reason, findings })).digest("hex");
+}
+
 function formatPolicyResponseEnvelopeError(error: z.ZodError): string {
   const invalidPath = error.issues[0]?.path[0];
   return invalidPath === undefined
@@ -552,10 +561,14 @@ function parsePolicyResponse(stdout: string): InstallPolicyResult {
   if (!response.success) {
     return blockedByFailure(formatPolicyResponseEnvelopeError(response.error));
   }
+  const fullFindings = (response.data.findings ?? [])
+    .map(normalizeFinding)
+    .filter((finding): finding is InstallPolicyFinding => finding !== null);
   const normalizedFindings = (response.data.findings ?? [])
     .slice(0, MAX_FINDINGS)
     .map(normalizeFinding)
-    .filter((finding): finding is InstallPolicyFinding => finding !== null);
+    .filter((finding): finding is InstallPolicyFinding => finding !== null)
+    .map(truncateFinding);
   if (response.data.decision === "allow") {
     return normalizedFindings.length > 0 ? { findings: normalizedFindings } : {};
   }
@@ -566,7 +579,13 @@ function parsePolicyResponse(stdout: string): InstallPolicyResult {
     );
   }
   if (response.data.decision === "warn") {
-    return warnedByPolicy(reason.data, normalizedFindings);
+    return {
+      warning: {
+        reason: truncateText(reason.data, MAX_REASON_CHARS),
+        fingerprint: fingerprintWarning(reason.data, fullFindings),
+      },
+      ...(normalizedFindings.length > 0 ? { findings: normalizedFindings } : {}),
+    };
   }
   return blockedByPolicy(reason.data, normalizedFindings);
 }

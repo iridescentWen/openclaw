@@ -435,7 +435,10 @@ describe("runInstallPolicy", () => {
     });
 
     expect(result).toEqual({
-      warning: { reason: "review this source" },
+      warning: {
+        reason: "review this source",
+        fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+      },
       findings: [
         {
           ruleId: "manual-review",
@@ -445,6 +448,53 @@ describe("runInstallPolicy", () => {
       ],
     });
     expect(debugLogs.filter((message) => message.endsWith(": warned"))).toHaveLength(1);
+  });
+
+  it("fingerprints warning reason changes beyond the display limit", async () => {
+    const sharedPrefix = "r".repeat(1000);
+    const runWarning = async (reason: string) =>
+      await runInstallPolicy({
+        config: configWithPolicy(scriptPath, {
+          POLICY_RESPONSE: JSON.stringify({ protocolVersion: 1, decision: "warn", reason }),
+        }),
+        request: baseRequest(sourceDir),
+      });
+
+    const first = await runWarning(`${sharedPrefix}-first`);
+    const second = await runWarning(`${sharedPrefix}-second`);
+
+    expect(first?.warning?.reason).toBe(second?.warning?.reason);
+    expect(first?.warning?.fingerprint).not.toBe(second?.warning?.fingerprint);
+  });
+
+  it("fingerprints warning findings beyond the display limit", async () => {
+    const visibleFindings = Array.from({ length: 100 }, (_, index) => ({
+      ruleId: `visible-${String(index)}`,
+      severity: "warn",
+      message: `Visible finding ${String(index)}`,
+    }));
+    const runWarning = async (extraMessage: string) =>
+      await runInstallPolicy({
+        config: configWithPolicy(scriptPath, {
+          POLICY_RESPONSE: JSON.stringify({
+            protocolVersion: 1,
+            decision: "warn",
+            reason: "review all findings",
+            findings: [
+              ...visibleFindings,
+              { ruleId: "hidden-100", severity: "warn", message: extraMessage },
+            ],
+          }),
+        }),
+        request: baseRequest(sourceDir),
+      });
+
+    const first = await runWarning("First hidden finding");
+    const second = await runWarning("Second hidden finding");
+
+    expect(first?.findings).toEqual(second?.findings);
+    expect(first?.findings).toHaveLength(100);
+    expect(first?.warning?.fingerprint).not.toBe(second?.warning?.fingerprint);
   });
 
   it.each([

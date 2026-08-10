@@ -1,7 +1,6 @@
 // Runtime bridge for plugin install security scanning.
 import fs from "node:fs/promises";
 import path from "node:path";
-import { isDeepStrictEqual } from "node:util";
 import { sanitizeTerminalText } from "../../packages/terminal-core/src/safe-text.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { formatErrorMessage } from "../infra/errors.js";
@@ -776,9 +775,7 @@ async function runOperatorInstallPolicy(params: {
       });
     }
     if (reevaluated?.warning) {
-      const warningUnchanged =
-        reevaluated.warning.reason === result.warning.reason &&
-        isDeepStrictEqual(reevaluated.findings ?? [], result.findings ?? []);
+      const warningUnchanged = reevaluated.warning.fingerprint === result.warning.fingerprint;
       if (!warningUnchanged) {
         return {
           blocked: {
