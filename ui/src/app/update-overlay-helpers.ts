@@ -2,6 +2,7 @@ import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import type { GatewayBrowserClient, GatewayHelloOk } from "../api/gateway.ts";
 import type { UpdateAvailable, UpdateScheduleState } from "../api/types.ts";
 import { t } from "../i18n/index.ts";
+import { formatCountdown } from "../lib/format.ts";
 
 export type ApplicationStatusBanner = {
   tone: "danger" | "warn" | "info";
@@ -587,12 +588,6 @@ export function projectUpdateStatusResponse(
   };
 }
 
-function formatUpdateCountdown(deadlineMs: number, nowMs = Date.now()): string {
-  const totalSeconds = Math.max(0, Math.ceil((deadlineMs - nowMs) / 1_000));
-  const minutes = Math.floor(totalSeconds / 60);
-  return `${minutes}:${String(totalSeconds % 60).padStart(2, "0")}`;
-}
-
 export function formatUpdateCampaignLabel(
   schedule: UpdateScheduleState | null | undefined,
   nowMs = Date.now(),
@@ -603,7 +598,7 @@ export function formatUpdateCampaignLabel(
   }
   if (campaign.holdUntilMs !== undefined && campaign.holdUntilMs > nowMs) {
     return t("updates.campaign.held", {
-      time: formatUpdateCountdown(campaign.holdUntilMs, nowMs),
+      time: formatCountdown(campaign.holdUntilMs, nowMs),
     });
   }
   if (campaign.state === "applying") {
@@ -611,11 +606,11 @@ export function formatUpdateCampaignLabel(
   }
   if (campaign.state === "waiting-for-idle") {
     return t("updates.campaign.waitingForIdle", {
-      time: formatUpdateCountdown(campaign.forceAtMs, nowMs),
+      time: formatCountdown(campaign.forceAtMs, nowMs),
     });
   }
   return t("updates.campaign.countdown", {
-    time: formatUpdateCountdown(campaign.applyAtMs ?? campaign.forceAtMs, nowMs),
+    time: formatCountdown(campaign.applyAtMs ?? campaign.forceAtMs, nowMs),
   });
 }
 

@@ -5198,24 +5198,6 @@ td.data-table-key-col {
   gap: 10px;
 }
 
-.device-pair-setup__command code {
-  padding: 14px;
-  overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg);
-  color: var(--text);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.device-pair-setup__command p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-  text-align: center;
-}
-
 .device-pair-setup__meta {
   display: flex;
   max-width: 100%;
