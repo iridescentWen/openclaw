@@ -46,8 +46,16 @@ export type HooksCheckOptions = {
 };
 
 type HooksUpdateOptions = {
+  acknowledgeInstallPolicyWarning?: boolean;
   all?: boolean;
   dryRun?: boolean;
+};
+
+type HooksInstallOptions = {
+  acknowledgeInstallPolicyWarning?: boolean;
+  force?: boolean;
+  link?: boolean;
+  pin?: boolean;
 };
 
 const GATEWAY_HOOKS_STATUS_TIMEOUT_MS = 1_500;
@@ -629,7 +637,12 @@ export function registerHooksCli(program: Command): void {
     .option("-l, --link", "Link a local path instead of copying", false)
     .option("--pin", "Record npm installs as exact resolved <name>@<version>", false)
     .option("--force", "Confirm non-ClawHub sources and overwrite an existing hook pack", false)
-    .action(async (raw: string, opts: { force?: boolean; link?: boolean; pin?: boolean }) => {
+    .option(
+      "--acknowledge-install-policy-warning",
+      "Acknowledge security.installPolicy warnings without prompting; blocks and failures remain terminal",
+      false,
+    )
+    .action(async (raw: string, opts: HooksInstallOptions) => {
       defaultRuntime.log(
         theme.warn("`openclaw hooks install` is deprecated; use `openclaw plugins install`."),
       );
@@ -642,6 +655,11 @@ export function registerHooksCli(program: Command): void {
     .argument("[id]", "Hook pack id (omit with --all)")
     .option("--all", "Update all tracked hooks", false)
     .option("--dry-run", "Show what would change without writing", false)
+    .option(
+      "--acknowledge-install-policy-warning",
+      "Acknowledge security.installPolicy warnings without prompting; blocks and failures remain terminal",
+      false,
+    )
     .action(async (id: string | undefined, opts: HooksUpdateOptions) => {
       defaultRuntime.log(
         theme.warn("`openclaw hooks update` is deprecated; use `openclaw plugins update`."),
