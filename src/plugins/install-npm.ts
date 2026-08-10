@@ -246,7 +246,7 @@ export async function installPluginFromNpmSpec(
         }),
     });
     if (preflightPolicyResult) {
-      return preflightPolicyResult;
+      return { ...preflightPolicyResult, npmResolution };
     }
   } finally {
     await fs.rm(policyTempDir, { recursive: true, force: true });
@@ -287,5 +287,5 @@ export async function installPluginFromNpmSpec(
     sourceFamily: "npm",
     trustedSourceLinkedOfficialInstall: params.trustedSourceLinkedOfficialInstall,
   });
-  return result;
+  return result.ok ? result : { ...result, npmResolution };
 }

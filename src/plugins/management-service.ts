@@ -202,9 +202,11 @@ type ManagedPluginSourceInstallResult =
       ok: false;
       error: string;
       code?: string;
+      integrity?: string;
       version?: string;
       warning?: string;
       installPolicyWarning?: InstallPolicyWarningDetails;
+      npmResolution?: NpmSpecResolution;
     };
 
 type SourceInstallerResult =
@@ -212,9 +214,11 @@ type SourceInstallerResult =
       ok: false;
       error: string;
       code?: string;
+      integrity?: string;
       version?: string;
       warning?: string;
       installPolicyWarning?: InstallPolicyWarningDetails;
+      npmResolution?: NpmSpecResolution;
     }
   | {
       ok: true;
@@ -1006,47 +1010,79 @@ function buildClawHubSpec(packageName: string, version?: string): string {
 function pinInstallPolicyResolvedRequest(
   request: ManagedPluginSourceInstallRequest,
   version: string | undefined,
-): ManagedPluginSourceInstallRequest {
-  if (request.source !== "clawhub" || !version) {
+  integrity: string | undefined,
+  npmResolution: NpmSpecResolution | undefined,
+): ManagedPluginSourceInstallRequest | undefined {
+  if (request.source === "official" || request.source === "npm") {
+    if (!npmResolution?.resolvedSpec || !npmResolution.integrity) {
+      return undefined;
+    }
+    return {
+      ...request,
+      spec: npmResolution.resolvedSpec,
+      expectedIntegrity: npmResolution.integrity,
+    };
+  }
+  if (request.source !== "clawhub") {
     return request;
   }
+  if (!version || !integrity) {
+    return undefined;
+  }
   const parsed = parseClawHubPluginSpec(request.spec);
-  return parsed ? { ...request, spec: buildClawHubSpec(parsed.name, version) } : request;
+  return parsed
+    ? {
+        ...request,
+        spec: buildClawHubSpec(parsed.name, version),
+        expectedIntegrity: integrity,
+      }
+    : undefined;
 }
 
 function throwInstallFailure(
   result: {
     error: string;
     code?: string;
+    integrity?: string;
     version?: string;
     warning?: string;
     installPolicyWarning?: InstallPolicyWarningDetails;
+    npmResolution?: NpmSpecResolution;
   },
   resolvedRequest?: ManagedPluginSourceInstallRequest,
   installPolicyAcknowledgedWarnings?: InstallPolicyWarningDetails[],
 ): never {
+  const installPolicyResolvedRequest =
+    result.installPolicyWarning && resolvedRequest
+      ? pinInstallPolicyResolvedRequest(
+          resolvedRequest,
+          result.version,
+          result.integrity,
+          result.npmResolution,
+        )
+      : undefined;
+  const resolutionUnavailable =
+    result.installPolicyWarning && resolvedRequest && !installPolicyResolvedRequest;
   const unavailable =
     !result.code ||
     result.code === CLAWHUB_INSTALL_ERROR_CODE.ARTIFACT_UNAVAILABLE ||
     result.code === CLAWHUB_INSTALL_ERROR_CODE.ARTIFACT_DOWNLOAD_UNAVAILABLE ||
     result.code === CLAWHUB_INSTALL_ERROR_CODE.CLAWHUB_SECURITY_UNAVAILABLE;
-  throw new ManagedPluginLifecycleError(result.error, {
-    kind: unavailable ? "unavailable" : "invalid-request",
-    code: result.code,
-    version: result.version,
-    warning: result.warning,
-    installPolicyWarning: result.installPolicyWarning,
-    ...(installPolicyAcknowledgedWarnings?.length ? { installPolicyAcknowledgedWarnings } : {}),
-    ...(result.installPolicyWarning && resolvedRequest
-      ? {
-          installPolicyResolvedRequest: pinInstallPolicyResolvedRequest(
-            resolvedRequest,
-            result.version,
-          ),
-        }
-      : {}),
-    cause: result,
-  });
+  throw new ManagedPluginLifecycleError(
+    resolutionUnavailable
+      ? `${result.error}\nOpenClaw could not bind this approval to immutable artifact resolution metadata, so the warning remains terminal.`
+      : result.error,
+    {
+      kind: unavailable ? "unavailable" : "invalid-request",
+      code: result.code,
+      version: result.version,
+      warning: result.warning,
+      installPolicyWarning: result.installPolicyWarning,
+      ...(installPolicyAcknowledgedWarnings?.length ? { installPolicyAcknowledgedWarnings } : {}),
+      ...(installPolicyResolvedRequest ? { installPolicyResolvedRequest } : {}),
+      cause: result,
+    },
+  );
 }
 
 function installRecordOwnsTarget(

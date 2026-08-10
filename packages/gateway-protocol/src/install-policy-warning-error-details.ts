@@ -89,8 +89,8 @@ export function readInstallPolicyWarningErrorDetails(
       return undefined;
     }
     findings = [];
-    for (const value of record.findings) {
-      const finding = readFinding(value);
+    for (const findingValue of record.findings) {
+      const finding = readFinding(findingValue);
       if (!finding) {
         return undefined;
       }

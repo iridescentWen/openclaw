@@ -79,35 +79,47 @@ async function readJson<T>(filePath: string): Promise<T> {
   return JSON.parse(await fs.readFile(filePath, "utf8")) as T;
 }
 
-const installedPackageTreePolicySource = `
+function installPolicySource(
+  decision: "block" | "warn",
+  sourcePathKind: "directory" | "file" = "directory",
+): string {
+  const subject = sourcePathKind === "directory" ? "installed package tree" : "npm metadata";
+  const reason = `${decision === "block" ? "blocked" : "review"} ${subject}`;
+  return `
 let input = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => { input += chunk; });
 process.stdin.on("end", () => {
   const request = JSON.parse(input);
-  if (request.sourcePathKind === "directory") {
+  if (request.sourcePathKind === "${sourcePathKind}") {
     process.stdout.write(JSON.stringify({
       protocolVersion: 1,
-      decision: "block",
-      reason: "blocked installed package tree",
+      decision: "${decision}",
+      reason: "${reason}",
     }));
     return;
   }
   process.stdout.write(JSON.stringify({ protocolVersion: 1, decision: "allow" }));
 });
 `;
+}
 
-async function createInstalledPackageTreePolicyExec(rootDir: string) {
+async function createInstalledPackageTreePolicyExec(
+  rootDir: string,
+  decision: "block" | "warn" = "block",
+  sourcePathKind: "directory" | "file" = "directory",
+) {
+  const policySource = installPolicySource(decision, sourcePathKind);
   if (process.platform === "win32") {
-    return { command: process.execPath, args: ["-e", installedPackageTreePolicySource] };
+    return { command: process.execPath, args: ["-e", policySource] };
   }
   const command = path.join(rootDir, "install-policy.cjs");
-  await fs.writeFile(command, `#!${process.execPath}\n${installedPackageTreePolicySource}`, "utf8");
+  await fs.writeFile(command, `#!${process.execPath}\n${policySource}`, "utf8");
   await fs.chmod(command, 0o700);
   return { command, args: [] };
 }
 
-function configWithInstalledPackageTreeBlockPolicy(exec: {
+function configWithInstalledPackageTreePolicy(exec: {
   command: string;
   args: string[];
 }): OpenClawConfig {
@@ -742,15 +754,14 @@ describe("installPluginFromNpmSpec e2e", () => {
     ]);
 
     const result = await installNpmPlugin({
-      config: configWithInstalledPackageTreeBlockPolicy(policyExec),
+      config: configWithInstalledPackageTreePolicy(policyExec),
       spec: `${blockedPlugin}@1.0.0`,
       npmRoot,
     });
 
-    expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe(PLUGIN_INSTALL_ERROR_CODE.SECURITY_SCAN_BLOCKED);
-      expect(result.error).toContain("blocked by install policy: blocked installed package tree");
+      expect(result.error).toContain("blocked installed package tree");
     }
     const projectRoot = pluginNpmProjectRoot(npmRoot, blockedPlugin);
     try {
@@ -770,6 +781,60 @@ describe("installPluginFromNpmSpec e2e", () => {
     await expect(
       fs.lstat(path.join(projectRoot, "node_modules", runtimePeer, "package.json")),
     ).rejects.toHaveProperty("code", "ENOENT");
+  });
+
+  it("preserves npm resolution on installed package policy warnings", async () => {
+    const { rootDir, npmRoot } = await makeInstallFixture("npm-plugin-policy-warning-e2e");
+    const policyExec = await createInstalledPackageTreePolicyExec(rootDir, "warn");
+    const packageName = uniquePackageName("warning-plugin");
+    const packageVersion = await packPlugin({ packageName, rootDir });
+    await useStaticRegistry([
+      { packageName, latest: packageVersion.version, versions: [packageVersion] },
+    ]);
+
+    const result = await installNpmPlugin({
+      config: configWithInstalledPackageTreePolicy(policyExec),
+      spec: `${packageName}@latest`,
+      npmRoot,
+    });
+
+    if (result.ok) {
+      throw new Error("expected installed package policy warning");
+    }
+    expect(result.code).toBe(PLUGIN_INSTALL_ERROR_CODE.SECURITY_SCAN_BLOCKED);
+    expect(result.installPolicyWarning?.reason).toBe("review installed package tree");
+    expect(result.npmResolution).toMatchObject({
+      resolvedSpec: `${packageName}@${packageVersion.version}`,
+      integrity: packageVersion.integrity,
+    });
+    await expect(
+      fs.lstat(path.join(pluginNpmProjectRoot(npmRoot, packageName), "node_modules", packageName)),
+    ).rejects.toHaveProperty("code", "ENOENT");
+  });
+
+  it("preserves npm resolution on preflight policy warnings", async () => {
+    const { rootDir, npmRoot } = await makeInstallFixture("npm-plugin-preflight-warning-e2e");
+    const policyExec = await createInstalledPackageTreePolicyExec(rootDir, "warn", "file");
+    const packageName = uniquePackageName("preflight-warning-plugin");
+    const packageVersion = await packPlugin({ packageName, rootDir });
+    await useStaticRegistry([
+      { packageName, latest: packageVersion.version, versions: [packageVersion] },
+    ]);
+
+    const result = await installNpmPlugin({
+      config: configWithInstalledPackageTreePolicy(policyExec),
+      spec: `${packageName}@latest`,
+      npmRoot,
+    });
+
+    if (result.ok) {
+      throw new Error("expected preflight policy warning");
+    }
+    expect(result.installPolicyWarning?.reason).toBe("review npm metadata");
+    expect(result.npmResolution).toMatchObject({
+      resolvedSpec: `${packageName}@${packageVersion.version}`,
+      integrity: packageVersion.integrity,
+    });
   });
 
   it("falls back to the legacy npm peer mode inside the plugin project when npm cannot plan third-party peers", async () => {
@@ -831,15 +896,14 @@ describe("installPluginFromNpmSpec e2e", () => {
     });
 
     const result = await installNpmPlugin({
-      config: configWithInstalledPackageTreeBlockPolicy(policyExec),
+      config: configWithInstalledPackageTreePolicy(policyExec),
       spec: `${blockedPlugin}@1.0.0`,
       npmRoot,
     });
 
-    expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe(PLUGIN_INSTALL_ERROR_CODE.SECURITY_SCAN_BLOCKED);
-      expect(result.error).toContain("blocked by install policy: blocked installed package tree");
+      expect(result.error).toContain("blocked installed package tree");
     }
     const rootManifest = await readJson<{
       dependencies?: Record<string, string>;

@@ -277,6 +277,49 @@ describe("installPackageDir", () => {
     ).resolves.toHaveLength(0);
   });
 
+  it("preserves caller-owned failure details from staged post-install validation", async () => {
+    await fixtureRootTracker.setup();
+    const fixtureRoot = await fixtureRootTracker.make("case");
+    const sourceDir = path.join(fixtureRoot, "source");
+    const installBaseDir = path.join(fixtureRoot, "plugins");
+    const targetDir = path.join(installBaseDir, "demo");
+    await fs.mkdir(sourceDir, { recursive: true });
+    await fs.writeFile(path.join(sourceDir, "marker.txt"), "new");
+    const installPolicyWarning = {
+      targetName: "demo",
+      targetType: "plugin" as const,
+      requestMode: "install" as const,
+      reason: "Review the installed dependency tree",
+    };
+
+    const result = await installPackageDir({
+      sourceDir,
+      targetDir,
+      mode: "install",
+      timeoutMs: 1_000,
+      copyErrorPrefix: "failed to copy plugin",
+      hasDeps: false,
+      depsLogMessage: "Installing deps…",
+      afterInstall: async () => ({
+        ok: false as const,
+        error: installPolicyWarning.reason,
+        code: "security_scan_blocked",
+        installPolicyWarning,
+      }),
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: installPolicyWarning.reason,
+      code: "security_scan_blocked",
+      installPolicyWarning,
+    });
+    await expectMissingPath(targetDir);
+    await expect(
+      listMatchingDirs(installBaseDir, ".openclaw-install-stage-"),
+    ).resolves.toHaveLength(0);
+  });
+
   it("restores the original install if publish rename fails", async () => {
     await fixtureRootTracker.setup();
     const fixtureRoot = await fixtureRootTracker.make("case");

@@ -1,9 +1,9 @@
 import { expectDefined } from "@openclaw/normalization-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  expectOneShotInstallPolicyWarningAcknowledgement,
-  officialDiffsWarningRequest,
-} from "./test-helpers/install-policy-warning.js";
+  emptyMetadataSnapshot,
+  metadataSnapshot,
+} from "./test-helpers/management-service-fixtures.js";
 
 const mocks = vi.hoisted(() => ({
   applyUninstall: vi.fn(),
@@ -125,60 +125,6 @@ function configSnapshot(config: Record<string, unknown> = {}) {
       includeFileHashesForWrite: { "/tmp/plugins.json": "include-hash" },
       includeFileTargetsForWrite: { "/tmp/plugins.json": "/tmp/plugins.json" },
     },
-  };
-}
-
-function metadataSnapshot(params: {
-  enabled: boolean;
-  id?: string;
-  name?: string;
-  origin?: "bundled" | "global";
-  installRecord?: Record<string, unknown>;
-  icon?: string;
-}) {
-  const id = params.id ?? "workboard";
-  const manifest = {
-    id,
-    name: params.name ?? "Workboard",
-    description: "Coordinate agent work in a shared board.",
-    catalog: { featured: true, order: 10 },
-    ...(params.icon ? { icon: params.icon } : {}),
-    channels: [],
-    providers: [],
-    cliBackends: [],
-    skills: [],
-    hooks: [],
-    origin: params.origin ?? "bundled",
-    rootDir: `/tmp/${id}`,
-    source: `/tmp/${id}/index.ts`,
-    manifestPath: `/tmp/${id}/openclaw.plugin.json`,
-  };
-  return {
-    index: {
-      plugins: [
-        {
-          pluginId: id,
-          packageName: `@openclaw/${id}`,
-          origin: params.origin ?? "bundled",
-          enabled: params.enabled,
-        },
-      ],
-      installRecords: params.installRecord ? { [id]: params.installRecord } : {},
-    },
-    byPluginId: new Map([[id, manifest]]),
-    plugins: [manifest],
-    diagnostics: [],
-    normalizePluginId: (pluginId: string) => pluginId,
-  };
-}
-
-function emptyMetadataSnapshot() {
-  return {
-    index: { plugins: [], installRecords: {} },
-    byPluginId: new Map(),
-    plugins: [],
-    diagnostics: [],
-    normalizePluginId: (pluginId: string) => pluginId,
   };
 }
 
@@ -776,69 +722,6 @@ describe("plugin management service", () => {
     expect(mocks.clawhubInstall).toHaveBeenCalledWith(
       expect.objectContaining({ expectedPluginId: "sonos" }),
     );
-  });
-
-  it("threads hosted ClawHub candidate integrity into official installs", async () => {
-    mocks.readConfig.mockResolvedValue(configSnapshot());
-    mockHostedOfficialCatalog([hostedFeedDiffsEntry]);
-    mockClawHubInstall("diffs", "@openclaw/diffs");
-    mocks.persistInstall.mockResolvedValue({});
-    mocks.metadata.mockReturnValue(
-      metadataSnapshot({ enabled: true, id: "diffs", name: "Diffs", origin: "global" }),
-    );
-
-    await installManagedPlugin({
-      request: officialDiffsWarningRequest,
-      env: {},
-    });
-
-    expect(mocks.clawhubInstall).toHaveBeenCalledWith(
-      expect.objectContaining({
-        spec: "clawhub:@openclaw/diffs@2026.6.11",
-        expectedPluginId: "diffs",
-        expectedIntegrity: `sha256-${Buffer.from("a".repeat(64), "hex").toString("base64")}`,
-      }),
-    );
-    await expectOneShotInstallPolicyWarningAcknowledgement(mocks.clawhubInstall);
-  });
-
-  it("acknowledges each reviewed install-policy warning once", async () => {
-    mocks.readConfig.mockResolvedValue(configSnapshot());
-    mockHostedOfficialCatalog([hostedFeedDiffsEntry]);
-    mockClawHubInstall("diffs", "@openclaw/diffs");
-    mocks.persistInstall.mockResolvedValue({});
-    mocks.metadata.mockReturnValue(
-      metadataSnapshot({ enabled: true, id: "diffs", name: "Diffs", origin: "global" }),
-    );
-    const firstWarning = expectDefined(
-      officialDiffsWarningRequest.installPolicyWarningAcknowledgement.warnings[0],
-      "first approved warning",
-    );
-    const secondWarning = { ...firstWarning, reason: "Review the dependency warning" };
-
-    await installManagedPlugin({
-      request: {
-        ...officialDiffsWarningRequest,
-        installPolicyWarningAcknowledgement: {
-          ...officialDiffsWarningRequest.installPolicyWarningAcknowledgement,
-          warnings: [firstWarning, secondWarning],
-        },
-      },
-      env: {},
-    });
-
-    const call = expectDefined(mocks.clawhubInstall.mock.calls[0], "clawhub install call");
-    const acknowledge = expectDefined(
-      (
-        call[0] as {
-          onInstallPolicyWarning?: (request: { warning: typeof firstWarning }) => Promise<boolean>;
-        }
-      ).onInstallPolicyWarning,
-      "install-policy acknowledgement callback",
-    );
-    expect(await acknowledge({ warning: firstWarning })).toBe(true);
-    expect(await acknowledge({ warning: secondWarning })).toBe(true);
-    expect(await acknowledge({ warning: firstWarning })).toBe(false);
   });
 
   it("removes only the newly installed managed target after persistence conflicts", async () => {

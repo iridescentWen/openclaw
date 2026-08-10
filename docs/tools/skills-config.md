@@ -194,13 +194,15 @@ may use `--acknowledge-install-policy-warning` as explicit approval after review
 every approved warning is re-evaluated before continuing.
 The flag is consumed by the first warning in one command; a later warning
 fails closed and requires interactive review.
-Gateway `plugins.install` clients receive structured warning details and may
-make one explicit retry with the returned `acknowledgementToken` as
+Gateway `plugins.install` clients receive structured warning details when the
+Gateway can bind the request to an immutable resolved artifact, and may make
+one explicit retry with the returned `acknowledgementToken` as
 `installPolicyWarningAcknowledgement`. The Gateway consumes that server-issued
 token once and only for the same install request and resolved artifact. OpenClaw
-re-evaluates the staged source and continues only when the warning is unchanged. A block, a
-changed warning, or a warning from a later package or dependency scan stops the
-request before commit and returns its own details. Other
+re-evaluates the staged source and continues only when the warning is unchanged.
+A changed or later warning stops the request before commit and receives a fresh
+token when the artifact remains immutably resolved. A block or a warning without
+immutable resolution metadata is terminal and has no acknowledgement token. Other
 Gateway-backed and automatic installs remain blocked on warnings because they
 have no operator-confirmation flow. A `block`, non-zero exit, timeout, invalid
 JSON, non-object response, missing or invalid protocol version or decision, or
