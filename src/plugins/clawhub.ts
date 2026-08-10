@@ -73,6 +73,7 @@ type ClawHubInstallFailure = {
   ok: false;
   error: string;
   code?: ClawHubInstallErrorCode;
+  integrity?: string;
   warning?: string;
   version?: string;
 };
@@ -1466,7 +1467,11 @@ export async function installPluginFromClawHub(
       },
     });
     if (!installResult.ok) {
-      return { ...installResult, version: versionState.version };
+      return {
+        ...installResult,
+        integrity: archive.integrity,
+        version: versionState.version,
+      };
     }
 
     const pkg = detail.package!;

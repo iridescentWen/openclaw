@@ -153,14 +153,16 @@ copy as suspicious ClawHub releases; policy is then re-evaluated. Reviewed
 non-interactive commands can use `--acknowledge-install-policy-warning`.
 That flag is consumed by the first warning in one command; a later warning
 fails closed and requires interactive review.
-Gateway `plugins.install` clients receive structured warning details and may
-make one explicit retry with the returned `acknowledgementToken` as
+Gateway `plugins.install` clients receive structured warning details when the
+Gateway can bind the request to an immutable resolved artifact, and may make
+one explicit retry with the returned `acknowledgementToken` as
 `installPolicyWarningAcknowledgement`. The Gateway consumes that server-issued
 token once and only for the same install request and resolved artifact. OpenClaw
 re-evaluates the staged source and continues only when the warning is unchanged.
-A block, a changed warning, or a warning from a later package or dependency scan
-stops the request before commit and returns its own details. Automatic installs
-remain blocked on warnings. The deprecated `--dangerously-force-unsafe-install`
+A changed or later warning stops the request before commit and receives a fresh
+token when the artifact remains immutably resolved. A block or a warning without
+immutable resolution metadata is terminal and has no acknowledgement token.
+Automatic installs remain blocked on warnings. The deprecated `--dangerously-force-unsafe-install`
 flag remains a no-op. Plugin
 `before_install` hooks run later, and only in OpenClaw processes where plugin
 hooks are loaded, so use `security.installPolicy` for operator-owned install

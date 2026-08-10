@@ -299,6 +299,7 @@ type InstallSuccess = {
 type InstallFailure = {
   code?: string;
   error: string;
+  integrity?: string;
   ok: false;
   version?: string;
   warning?: string;
@@ -1794,7 +1795,11 @@ describe("installPluginFromClawHub", () => {
       baseUrl: "https://clawhub.ai",
     });
 
-    expect(expectInstallFailure(result).error).toBe("bad archive");
+    expect(expectInstallFailure(result)).toMatchObject({
+      error: "bad archive",
+      integrity: DEMO_ARCHIVE_INTEGRITY,
+      version: "2026.3.22",
+    });
     expect(archiveCleanupMock).toHaveBeenCalledTimes(1);
   });
 

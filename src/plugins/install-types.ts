@@ -56,6 +56,7 @@ export type InstallPluginResult =
       error: string;
       code?: PluginInstallErrorCode;
       installPolicyWarning?: InstallPolicyWarningDetails;
+      npmResolution?: NpmSpecResolution;
     };
 
 export type PluginInstallFailureResult = Extract<InstallPluginResult, { ok: false }>;

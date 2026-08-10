@@ -432,19 +432,11 @@ export async function installPluginDirectoryIntoExtensions(params: {
       if (!postInstallResult) {
         return { ok: true as const };
       }
-      return {
-        ok: false as const,
-        error: postInstallResult.error,
-        ...(postInstallResult.code ? { code: postInstallResult.code } : {}),
-      };
+      return postInstallResult;
     },
   });
   if (!installRes.ok) {
-    return {
-      ok: false,
-      error: installRes.error,
-      ...(installRes.code ? { code: installRes.code as PluginInstallErrorCode } : {}),
-    };
+    return installRes;
   }
 
   return buildDirectoryInstallResult({
