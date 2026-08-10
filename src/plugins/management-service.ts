@@ -125,7 +125,7 @@ export type ManagedPluginInstallRequest =
       version?: string;
       acknowledgeClawHubRisk?: boolean;
       installPolicyWarningAcknowledgement?: {
-        warning: InstallPolicyWarningDetails;
+        warnings: InstallPolicyWarningDetails[];
         resolvedRequest: ManagedPluginSourceInstallRequest;
       };
     }
@@ -133,7 +133,7 @@ export type ManagedPluginInstallRequest =
       source: "official";
       pluginId: string;
       installPolicyWarningAcknowledgement?: {
-        warning: InstallPolicyWarningDetails;
+        warnings: InstallPolicyWarningDetails[];
         resolvedRequest: ManagedPluginSourceInstallRequest;
       };
     };
@@ -230,6 +230,7 @@ export class ManagedPluginLifecycleError extends Error {
   readonly version?: string;
   readonly warning?: string;
   readonly installPolicyWarning?: InstallPolicyWarningDetails;
+  readonly installPolicyAcknowledgedWarnings?: InstallPolicyWarningDetails[];
   readonly installPolicyResolvedRequest?: ManagedPluginSourceInstallRequest;
 
   constructor(
@@ -240,6 +241,7 @@ export class ManagedPluginLifecycleError extends Error {
       version?: string;
       warning?: string;
       installPolicyWarning?: InstallPolicyWarningDetails;
+      installPolicyAcknowledgedWarnings?: InstallPolicyWarningDetails[];
       installPolicyResolvedRequest?: ManagedPluginSourceInstallRequest;
       cause?: unknown;
     },
@@ -251,6 +253,7 @@ export class ManagedPluginLifecycleError extends Error {
     this.version = details?.version;
     this.warning = details?.warning;
     this.installPolicyWarning = details?.installPolicyWarning;
+    this.installPolicyAcknowledgedWarnings = details?.installPolicyAcknowledgedWarnings;
     this.installPolicyResolvedRequest = details?.installPolicyResolvedRequest;
   }
 }
@@ -1020,6 +1023,7 @@ function throwInstallFailure(
     installPolicyWarning?: InstallPolicyWarningDetails;
   },
   resolvedRequest?: ManagedPluginSourceInstallRequest,
+  installPolicyAcknowledgedWarnings?: InstallPolicyWarningDetails[],
 ): never {
   const unavailable =
     !result.code ||
@@ -1032,6 +1036,7 @@ function throwInstallFailure(
     version: result.version,
     warning: result.warning,
     installPolicyWarning: result.installPolicyWarning,
+    ...(installPolicyAcknowledgedWarnings?.length ? { installPolicyAcknowledgedWarnings } : {}),
     ...(result.installPolicyWarning && resolvedRequest
       ? {
           installPolicyResolvedRequest: pinInstallPolicyResolvedRequest(
@@ -1117,6 +1122,7 @@ function throwPersistenceFailureWithCleanupWarnings(error: unknown, warnings: st
       version: error.version,
       warning: [error.warning, cleanupWarning].filter(Boolean).join("\n"),
       installPolicyWarning: error.installPolicyWarning,
+      installPolicyAcknowledgedWarnings: error.installPolicyAcknowledgedWarnings,
       installPolicyResolvedRequest: error.installPolicyResolvedRequest,
       cause: error,
     });
@@ -1467,9 +1473,10 @@ export async function installManagedPlugin(params: {
     const officialCatalog = await loadOfficialCatalog();
     const warnings: string[] = [];
     const installLogger = createInstallLogger(warnings);
-    let installPolicyWarningAcknowledgementAvailable = Boolean(
-      params.request.installPolicyWarningAcknowledgement,
-    );
+    const remainingInstallPolicyWarnings = [
+      ...(params.request.installPolicyWarningAcknowledgement?.warnings ?? []),
+    ];
+    const acknowledgedInstallPolicyWarnings: InstallPolicyWarningDetails[] = [];
     const request =
       params.request.installPolicyWarningAcknowledgement?.resolvedRequest ??
       (params.request.source === "clawhub"
@@ -1491,14 +1498,17 @@ export async function installManagedPlugin(params: {
         ? {
             safetyOverrides: {
               onInstallPolicyWarning: async ({ warning }) => {
-                if (!installPolicyWarningAcknowledgementAvailable) {
+                const warningIndex = remainingInstallPolicyWarnings.findIndex((approved) =>
+                  isDeepStrictEqual(warning, approved),
+                );
+                if (warningIndex < 0) {
                   return false;
                 }
-                installPolicyWarningAcknowledgementAvailable = false;
-                return isDeepStrictEqual(
-                  warning,
-                  params.request.installPolicyWarningAcknowledgement?.warning,
-                );
+                const [approved] = remainingInstallPolicyWarnings.splice(warningIndex, 1);
+                if (approved) {
+                  acknowledgedInstallPolicyWarnings.push(approved);
+                }
+                return true;
               },
             },
           }
@@ -1508,7 +1518,7 @@ export async function installManagedPlugin(params: {
       runtime: createSilentRuntime(),
     });
     if (!installed.ok) {
-      return throwInstallFailure(installed, request);
+      return throwInstallFailure(installed, request, acknowledgedInstallPolicyWarnings);
     }
     const catalog = await listManagedPlugins({
       config: installed.config,

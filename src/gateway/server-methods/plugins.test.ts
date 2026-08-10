@@ -12,6 +12,7 @@ const managementMocks = vi.hoisted(() => {
     readonly version?: string;
     readonly warning?: string;
     readonly installPolicyWarning?: InstallPolicyWarningDetails;
+    readonly installPolicyAcknowledgedWarnings?: InstallPolicyWarningDetails[];
     readonly installPolicyResolvedRequest?: ManagedPluginSourceInstallRequest;
 
     constructor(
@@ -22,6 +23,7 @@ const managementMocks = vi.hoisted(() => {
         version?: string;
         warning?: string;
         installPolicyWarning?: InstallPolicyWarningDetails;
+        installPolicyAcknowledgedWarnings?: InstallPolicyWarningDetails[];
         installPolicyResolvedRequest?: ManagedPluginSourceInstallRequest;
       },
     ) {
@@ -31,6 +33,7 @@ const managementMocks = vi.hoisted(() => {
       this.version = details?.version;
       this.warning = details?.warning;
       this.installPolicyWarning = details?.installPolicyWarning;
+      this.installPolicyAcknowledgedWarnings = details?.installPolicyAcknowledgedWarnings;
       this.installPolicyResolvedRequest = details?.installPolicyResolvedRequest;
     }
   }
@@ -439,21 +442,23 @@ describe("plugin management Gateway handlers", () => {
             source: "clawhub",
             spec: "clawhub:community/plugin@1.0.0",
           },
-          warning: {
-            targetName: "demo-plugin",
-            targetType: "plugin",
-            requestMode: "install",
-            reason: "Scanner found behavior that needs review",
-            findings: [
-              {
-                ruleId: "dynamic-eval",
-                severity: "warn",
-                message: "Dynamic code execution",
-                file: "index.js",
-                line: 12,
-              },
-            ],
-          },
+          warnings: [
+            {
+              targetName: "demo-plugin",
+              targetType: "plugin",
+              requestMode: "install",
+              reason: "Scanner found behavior that needs review",
+              findings: [
+                {
+                  ruleId: "dynamic-eval",
+                  severity: "warn",
+                  message: "Dynamic code execution",
+                  file: "index.js",
+                  line: 12,
+                },
+              ],
+            },
+          ],
         },
       },
     });
@@ -483,12 +488,14 @@ describe("plugin management Gateway handlers", () => {
             source: "clawhub",
             spec: "clawhub:community/plugin@1.0.0",
           },
-          warning: {
-            targetName: "demo-plugin",
-            targetType: "plugin",
-            requestMode: "install",
-            reason: "Scanner found a different issue",
-          },
+          warnings: [
+            {
+              targetName: "demo-plugin",
+              targetType: "plugin",
+              requestMode: "install",
+              reason: "Scanner found a different issue",
+            },
+          ],
         },
       },
     });
@@ -540,6 +547,76 @@ describe("plugin management Gateway handlers", () => {
       message: expect.stringContaining("does not match this plugin"),
     });
     expect(managementMocks.install).toHaveBeenCalledOnce();
+  });
+
+  it("carries earlier approvals into a token for a later scan-stage warning", async () => {
+    const firstWarning: InstallPolicyWarningDetails = {
+      targetName: "demo-plugin",
+      targetType: "plugin",
+      requestMode: "install",
+      reason: "Review the package warning",
+    };
+    const secondWarning: InstallPolicyWarningDetails = {
+      ...firstWarning,
+      reason: "Review the dependency warning",
+    };
+    const resolvedRequest = {
+      source: "clawhub" as const,
+      spec: "clawhub:community/plugin@1.0.0",
+    };
+    managementMocks.install.mockRejectedValueOnce(
+      new managementMocks.ManagedPluginLifecycleError("First warning", {
+        installPolicyResolvedRequest: resolvedRequest,
+        installPolicyWarning: firstWarning,
+      }),
+    );
+    const first = await callHandler("plugins.install", {
+      source: "clawhub",
+      packageName: "community/plugin",
+    });
+    const firstToken = expectDefined(
+      (first.error as { details?: { acknowledgementToken?: string } }).details
+        ?.acknowledgementToken,
+      "first acknowledgement token",
+    );
+
+    managementMocks.install.mockRejectedValueOnce(
+      new managementMocks.ManagedPluginLifecycleError("Second warning", {
+        installPolicyResolvedRequest: resolvedRequest,
+        installPolicyWarning: secondWarning,
+        installPolicyAcknowledgedWarnings: [firstWarning],
+      }),
+    );
+    const second = await callHandler("plugins.install", {
+      source: "clawhub",
+      packageName: "community/plugin",
+      installPolicyWarningAcknowledgement: firstToken,
+    });
+    const secondToken = expectDefined(
+      (second.error as { details?: { acknowledgementToken?: string } }).details
+        ?.acknowledgementToken,
+      "second acknowledgement token",
+    );
+
+    managementMocks.install.mockResolvedValueOnce({
+      plugin: { ...workboard, id: "diffs", name: "Diffs", enabled: true, state: "enabled" },
+    });
+    await callHandler("plugins.install", {
+      source: "clawhub",
+      packageName: "community/plugin",
+      installPolicyWarningAcknowledgement: secondToken,
+    });
+
+    expect(managementMocks.install).toHaveBeenLastCalledWith({
+      request: {
+        source: "clawhub",
+        packageName: "community/plugin",
+        installPolicyWarningAcknowledgement: {
+          resolvedRequest,
+          warnings: [firstWarning, secondWarning],
+        },
+      },
+    });
   });
 
   it("classifies ClawHub security outages as unavailable", async () => {

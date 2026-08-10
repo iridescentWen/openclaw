@@ -18,12 +18,14 @@ export const officialDiffsWarningRequest = {
       expectedPluginId: "diffs",
       expectedIntegrity: `sha256-${Buffer.from("a".repeat(64), "hex").toString("base64")}`,
     },
-    warning: {
-      targetName: "diffs",
-      targetType: "plugin",
-      requestMode: "install",
-      reason: "Review this warning",
-    },
+    warnings: [
+      {
+        targetName: "diffs",
+        targetType: "plugin",
+        requestMode: "install",
+        reason: "Review this warning",
+      },
+    ],
   },
 } as const;
 
