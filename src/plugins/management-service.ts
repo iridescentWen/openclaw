@@ -1434,6 +1434,9 @@ export async function installManagedPlugin(params: {
     const officialCatalog = await loadOfficialCatalog();
     const warnings: string[] = [];
     const installLogger = createInstallLogger(warnings);
+    let installPolicyWarningAcknowledgementAvailable = Boolean(
+      params.request.acknowledgeInstallPolicyWarning,
+    );
     const request =
       params.request.source === "clawhub"
         ? resolveManagedClawHubInstallRequest({
@@ -1453,7 +1456,13 @@ export async function installManagedPlugin(params: {
       ...(params.request.acknowledgeInstallPolicyWarning
         ? {
             safetyOverrides: {
-              onInstallPolicyWarning: async () => true,
+              onInstallPolicyWarning: async () => {
+                if (!installPolicyWarningAcknowledgementAvailable) {
+                  return false;
+                }
+                installPolicyWarningAcknowledgementAvailable = false;
+                return true;
+              },
             },
           }
         : {}),

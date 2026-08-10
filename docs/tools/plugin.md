@@ -153,9 +153,12 @@ copy as suspicious ClawHub releases; policy is then re-evaluated. Reviewed
 non-interactive commands can use `--acknowledge-install-policy-warning`.
 That flag is consumed by the first warning in one command; a later warning
 fails closed and requires interactive review.
-Gateway-backed and automatic installs remain blocked on
-warnings because they have no operator-confirmation flow. The deprecated
-`--dangerously-force-unsafe-install` flag remains a no-op. Plugin
+Gateway `plugins.install` clients receive structured warning details and may
+make one explicit retry with `acknowledgeInstallPolicyWarning: true`. That
+approval is consumed by the first warning, which is re-evaluated before the
+install continues; a block or later warning stops the request before commit
+and returns its own details. Automatic installs remain blocked on warnings. The
+deprecated `--dangerously-force-unsafe-install` flag remains a no-op. Plugin
 `before_install` hooks run later, and only in OpenClaw processes where plugin
 hooks are loaded, so use `security.installPolicy` for operator-owned install
 decisions instead. The flag does not override a block, policy failure, or

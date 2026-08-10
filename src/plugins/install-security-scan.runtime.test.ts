@@ -472,13 +472,20 @@ describe("legacy file install scan compatibility", () => {
       findings: [{ ruleId: "context", severity: "info", message: "Informational context." }],
     });
 
-    await scanFileInstallSourceRuntime({
+    const result = await scanFileInstallSourceRuntime({
       filePath: "/tmp/payload.js",
       logger: { warn: (message) => warnings.push(message) },
       onInstallPolicyWarning: vi.fn().mockResolvedValue({ status: "declined" }),
       pluginId: "payload",
     });
 
+    expect(result?.blocked?.installPolicyWarning).toEqual({
+      targetName: "payload",
+      targetType: "plugin",
+      requestMode: "install",
+      reason: "review this plugin",
+      findings: [{ ruleId: "context", severity: "info", message: "Informational context." }],
+    });
     expect(warnings).toEqual([
       `${expectedInstallPolicyNotice({
         decision: "warn",
