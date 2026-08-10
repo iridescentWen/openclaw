@@ -8,6 +8,25 @@ type InstallPolicyWarningCall = {
   ) => Promise<boolean>;
 };
 
+export const officialDiffsWarningRequest = {
+  source: "official",
+  pluginId: "diffs",
+  installPolicyWarningAcknowledgement: {
+    resolvedRequest: {
+      source: "clawhub",
+      spec: "clawhub:@openclaw/diffs@2026.6.11",
+      expectedPluginId: "diffs",
+      expectedIntegrity: `sha256-${Buffer.from("a".repeat(64), "hex").toString("base64")}`,
+    },
+    warning: {
+      targetName: "diffs",
+      targetType: "plugin",
+      requestMode: "install",
+      reason: "Review this warning",
+    },
+  },
+} as const;
+
 export async function expectOneShotInstallPolicyWarningAcknowledgement(mock: {
   mock: { calls: unknown[][] };
 }): Promise<void> {
@@ -21,6 +40,12 @@ export async function expectOneShotInstallPolicyWarningAcknowledgement(mock: {
     targetName: "diffs",
     targetType: "plugin",
     requestMode: "install",
+    warning: {
+      targetName: "diffs",
+      targetType: "plugin",
+      requestMode: "install",
+      reason: "Review this warning",
+    },
   };
   expect(await acknowledge(request)).toBe(true);
   expect(await acknowledge(request)).toBe(false);

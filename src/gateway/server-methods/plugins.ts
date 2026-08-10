@@ -1,4 +1,5 @@
 // Gateway control-plane handlers for cold plugin catalog and lifecycle operations.
+import { randomUUID } from "node:crypto";
 import {
   buildClawHubTrustErrorDetails,
   INSTALL_POLICY_WARNING_ACKNOWLEDGEMENT_REQUIRED,
@@ -11,9 +12,11 @@ import {
   validatePluginsSearchParams,
   validatePluginsSetEnabledParams,
   validatePluginsUninstallParams,
+  type PluginsInstallParams,
 } from "../../../packages/gateway-protocol/src/index.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { searchInstallablePluginPackages } from "../../plugins/catalog-search.js";
+import type { InstallPolicyWarningDetails } from "../../plugins/install-security-scan.types.js";
 import {
   formatManagedPluginLifecycleError,
   installManagedPlugin,
@@ -21,12 +24,111 @@ import {
   ManagedPluginLifecycleError,
   setManagedPluginEnabled,
   uninstallManagedPlugin,
+  type ManagedPluginInstallRequest,
+  type ManagedPluginSourceInstallRequest,
 } from "../../plugins/management-service.js";
 import { buildGatewayReloadPlan } from "../config-reload-plan.js";
 import { resolveGatewayReloadSettings } from "../config-reload-settings.js";
 import { readInstallPolicyWarningErrorDetails } from "../install-policy-warning-error-details.js";
 import type { GatewayRequestHandlers } from "./types.js";
 import { assertValidParams } from "./validation.js";
+
+const INSTALL_POLICY_ACKNOWLEDGEMENT_TTL_MS = 5 * 60_000;
+const MAX_INSTALL_POLICY_ACKNOWLEDGEMENTS = 256;
+
+type InstallPolicyAcknowledgement = {
+  expiresAt: number;
+  requestKey: string;
+  resolvedRequest: ManagedPluginSourceInstallRequest;
+  warning: InstallPolicyWarningDetails;
+};
+
+const installPolicyAcknowledgements = new Map<string, InstallPolicyAcknowledgement>();
+
+function installPolicyRequestKey(request: PluginsInstallParams): string {
+  return request.source === "clawhub"
+    ? JSON.stringify({
+        source: request.source,
+        packageName: request.packageName,
+        version: request.version ?? null,
+        acknowledgeClawHubRisk: request.acknowledgeClawHubRisk ?? false,
+      })
+    : JSON.stringify({ source: request.source, pluginId: request.pluginId });
+}
+
+function pruneInstallPolicyAcknowledgements(now: number): void {
+  for (const [token, acknowledgement] of installPolicyAcknowledgements) {
+    if (acknowledgement.expiresAt <= now) {
+      installPolicyAcknowledgements.delete(token);
+    }
+  }
+  while (installPolicyAcknowledgements.size >= MAX_INSTALL_POLICY_ACKNOWLEDGEMENTS) {
+    const oldestToken = installPolicyAcknowledgements.keys().next().value;
+    if (typeof oldestToken !== "string") {
+      break;
+    }
+    installPolicyAcknowledgements.delete(oldestToken);
+  }
+}
+
+function issueInstallPolicyAcknowledgement(params: {
+  request: PluginsInstallParams;
+  resolvedRequest: ManagedPluginSourceInstallRequest;
+  warning: InstallPolicyWarningDetails;
+}): string {
+  const now = Date.now();
+  pruneInstallPolicyAcknowledgements(now);
+  const token = randomUUID();
+  installPolicyAcknowledgements.set(token, {
+    expiresAt: now + INSTALL_POLICY_ACKNOWLEDGEMENT_TTL_MS,
+    requestKey: installPolicyRequestKey(params.request),
+    resolvedRequest: params.resolvedRequest,
+    warning: params.warning,
+  });
+  return token;
+}
+
+function consumeInstallPolicyAcknowledgement(
+  request: PluginsInstallParams,
+): Pick<InstallPolicyAcknowledgement, "resolvedRequest" | "warning"> | undefined {
+  const token = request.installPolicyWarningAcknowledgement;
+  if (!token) {
+    return undefined;
+  }
+  const acknowledgement = installPolicyAcknowledgements.get(token);
+  installPolicyAcknowledgements.delete(token);
+  if (
+    !acknowledgement ||
+    acknowledgement.expiresAt <= Date.now() ||
+    acknowledgement.requestKey !== installPolicyRequestKey(request)
+  ) {
+    throw new ManagedPluginLifecycleError(
+      "Install policy approval expired or does not match this plugin. Review the current warning and try again.",
+    );
+  }
+  return {
+    resolvedRequest: acknowledgement.resolvedRequest,
+    warning: acknowledgement.warning,
+  };
+}
+
+function managedInstallRequest(params: PluginsInstallParams): ManagedPluginInstallRequest {
+  const installPolicyWarningAcknowledgement = consumeInstallPolicyAcknowledgement(params);
+  if (params.source === "clawhub") {
+    return {
+      source: params.source,
+      packageName: params.packageName,
+      ...(params.version ? { version: params.version } : {}),
+      ...(params.acknowledgeClawHubRisk ? { acknowledgeClawHubRisk: true } : {}),
+      ...(installPolicyWarningAcknowledgement ? { installPolicyWarningAcknowledgement } : {}),
+    };
+  }
+  return {
+    source: params.source,
+    pluginId: params.pluginId,
+    ...(installPolicyWarningAcknowledgement ? { installPolicyWarningAcknowledgement } : {}),
+  };
+}
 
 function pluginPolicyRestartRequired(params: {
   config: OpenClawConfig;
@@ -120,7 +222,7 @@ export const pluginsHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const result = await installManagedPlugin({ request: params });
+      const result = await installManagedPlugin({ request: managedInstallRequest(params) });
       respond(
         true,
         {
@@ -144,12 +246,18 @@ export const pluginsHandlers: GatewayRequestHandlers = {
             ...(lifecycleError.warning ? { warning: lifecycleError.warning } : {}),
           })
         : undefined;
-      const installPolicyDetails = lifecycleError?.installPolicyWarning
-        ? readInstallPolicyWarningErrorDetails({
-            installPolicyCode: INSTALL_POLICY_WARNING_ACKNOWLEDGEMENT_REQUIRED,
-            ...lifecycleError.installPolicyWarning,
-          })
-        : undefined;
+      const installPolicyDetails =
+        lifecycleError?.installPolicyWarning && lifecycleError.installPolicyResolvedRequest
+          ? readInstallPolicyWarningErrorDetails({
+              installPolicyCode: INSTALL_POLICY_WARNING_ACKNOWLEDGEMENT_REQUIRED,
+              ...lifecycleError.installPolicyWarning,
+              acknowledgementToken: issueInstallPolicyAcknowledgement({
+                request: params,
+                resolvedRequest: lifecycleError.installPolicyResolvedRequest,
+                warning: lifecycleError.installPolicyWarning,
+              }),
+            })
+          : undefined;
       const details = installPolicyDetails ?? trustDetails;
       respond(
         false,

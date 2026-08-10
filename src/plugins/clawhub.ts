@@ -1466,7 +1466,7 @@ export async function installPluginFromClawHub(
       },
     });
     if (!installResult.ok) {
-      return installResult;
+      return { ...installResult, version: versionState.version };
     }
 
     const pkg = detail.package!;

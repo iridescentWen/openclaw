@@ -1,6 +1,9 @@
 import { expectDefined } from "@openclaw/normalization-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { expectOneShotInstallPolicyWarningAcknowledgement } from "./test-helpers/install-policy-warning.js";
+import {
+  expectOneShotInstallPolicyWarningAcknowledgement,
+  officialDiffsWarningRequest,
+} from "./test-helpers/install-policy-warning.js";
 
 const mocks = vi.hoisted(() => ({
   applyUninstall: vi.fn(),
@@ -785,7 +788,7 @@ describe("plugin management service", () => {
     );
 
     await installManagedPlugin({
-      request: { source: "official", pluginId: "diffs", acknowledgeInstallPolicyWarning: true },
+      request: officialDiffsWarningRequest,
       env: {},
     });
 
@@ -794,7 +797,6 @@ describe("plugin management service", () => {
         spec: "clawhub:@openclaw/diffs@2026.6.11",
         expectedPluginId: "diffs",
         expectedIntegrity: `sha256-${Buffer.from("a".repeat(64), "hex").toString("base64")}`,
-        onInstallPolicyWarning: expect.any(Function),
       }),
     );
     await expectOneShotInstallPolicyWarningAcknowledgement(mocks.clawhubInstall);

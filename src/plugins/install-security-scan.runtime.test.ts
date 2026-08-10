@@ -293,6 +293,12 @@ describe("legacy file install scan compatibility", () => {
       targetName: "payload",
       targetType: "plugin",
       requestMode: "install",
+      warning: {
+        targetName: "payload",
+        targetType: "plugin",
+        requestMode: "install",
+        reason: "review this plugin",
+      },
     });
     expect(onInstallPolicyWarning).toHaveBeenCalledTimes(1);
     expect(runInstallPolicyMock).toHaveBeenCalledTimes(2);

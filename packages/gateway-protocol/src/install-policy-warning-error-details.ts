@@ -19,6 +19,7 @@ export type InstallPolicyWarningErrorDetails = {
   targetType: "skill" | "plugin";
   requestMode: "install" | "update";
   reason: string;
+  acknowledgementToken: string;
   findings?: InstallPolicyWarningErrorFinding[];
 };
 
@@ -37,6 +38,7 @@ const installPolicyWarningErrorDetailsSchema = z.object({
   targetType: z.enum(["skill", "plugin"]),
   requestMode: z.enum(["install", "update"]),
   reason: z.string().trim().min(1),
+  acknowledgementToken: z.string().trim().min(1),
   findings: z.array(installPolicyWarningFindingSchema).optional(),
 });
 
