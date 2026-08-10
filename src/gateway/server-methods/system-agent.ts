@@ -68,6 +68,7 @@ import {
   runSystemAgentGatewayOwnerTask,
   runSystemAgentGatewayTask,
 } from "./system-agent-execution-lifecycle.js";
+import { retainSystemAgentSessionPersistentApplySettlement } from "./system-agent-session-disposal.js";
 import {
   evictOldestSystemAgentSession,
   getSystemAgentSessionQueue,
@@ -490,6 +491,7 @@ export const systemAgentHandlers: GatewayRequestHandlers = {
           const existing = sessions.get(sessionId);
           // Persist the reset first; a failed write must leave the live session intact.
           appendTranscriptReset();
+          retainSystemAgentSessionPersistentApplySettlement(existing);
           sessions.delete(sessionId);
           if (existing?.pendingApproval) {
             context.systemAgentApprovalManager?.expire(
@@ -698,6 +700,7 @@ export const systemAgentHandlers: GatewayRequestHandlers = {
           // cannot resume partial proposal or CLI-session state.
           // Initialization failures stay unmarked because no live session existed.
           if (sessions.get(sessionId)?.engine === session.engine) {
+            retainSystemAgentSessionPersistentApplySettlement(session);
             sessions.delete(sessionId);
           }
           try {

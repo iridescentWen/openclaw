@@ -23,6 +23,16 @@ function expirePendingApprovals(
   }
 }
 
+/** Retains only a removed session's commit-locked setup work across Gateway restart. */
+export function retainSystemAgentSessionPersistentApplySettlement(
+  session: SystemAgentSession | undefined,
+): void {
+  const settlement = session?.engine.getPersistentApplySettlement();
+  if (settlement) {
+    retainRetiredSystemAgentMutationSettlement(settlement);
+  }
+}
+
 export async function disposeSystemAgentSessionsForOwner(
   sessions: GatewayRequestContext["systemAgentSessions"],
   ownerKey: string,

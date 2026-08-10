@@ -6,12 +6,15 @@ import { expectDefined } from "@openclaw/normalization-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { resetCommandQueueStateForTest } from "../../process/command-queue.test-support.js";
+import { createDeferred } from "../../shared/deferred.js";
 import { closeOpenClawStateDatabase } from "../../state/openclaw-state-db.js";
 import { SystemAgentChatEngine } from "../../system-agent/chat-engine.js";
 import { SystemAgentInferenceUnavailableError } from "../../system-agent/inference-error.js";
 import { createSystemAgentVerifiedInferenceTestFixture } from "../../system-agent/system-agent.test-helpers.js";
 import { appendTranscriptTurn, readTranscriptTail } from "../../system-agent/transcript-store.js";
 import { withTempDir } from "../../test-helpers/temp-dir.js";
+import { runSystemAgentGatewayTask } from "./system-agent-execution-lifecycle.js";
+import { disposeSystemAgentSessions } from "./system-agent-session-disposal.js";
 import { systemAgentHandlers, type SystemAgentChatSession } from "./system-agent.js";
 import type { GatewayClient, GatewayRequestContext } from "./types.js";
 
@@ -78,18 +81,27 @@ afterEach(() => {
   resetCommandQueueStateForTest();
 });
 
-function discardableSessions(dispose: () => Promise<void>): Map<string, SystemAgentChatSession> {
+function discardableSessions(
+  dispose: () => Promise<void>,
+  persistentApplySettlement: Promise<void> | null = null,
+): Map<string, SystemAgentChatSession> {
   return new Map([
     [
       "s1",
       {
-        engine: { dispose },
+        engine: { dispose, getPersistentApplySettlement: () => persistentApplySettlement },
         welcome: "welcome text",
         lastUsedAt: 1,
         ownerKey: "device:device-test",
       },
     ],
   ]) as unknown as Map<string, SystemAgentChatSession>;
+}
+
+async function waitForTaskAdmission(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setImmediate(resolve);
+  });
 }
 
 async function resetSession(params: {
@@ -235,6 +247,38 @@ describe("openclaw.chat reset boundary", () => {
 
       expect(sessions.has("s1")).toBe(false);
       expect(nextSessionSeed()).toEqual([]);
+    });
+  });
+
+  it("fences a removed session's persistent apply across forced restart", async () => {
+    await withTranscriptState("openclaw-reset-boundary-restart-", async () => {
+      const disposeStarted = createDeferred();
+      const releaseDispose = createDeferred();
+      const releaseApply = createDeferred();
+      const sessions = discardableSessions(async () => {
+        disposeStarted.resolve();
+        await releaseDispose.promise;
+      }, releaseApply.promise);
+      const reset = resetSession({ sessions });
+      await disposeStarted.promise;
+      expect(sessions.has("s1")).toBe(false);
+
+      await disposeSystemAgentSessions(sessions, new Map());
+      releaseDispose.resolve();
+      await expect(reset).rejects.toThrow("Gateway generation has been retired");
+
+      const replacementTask = vi.fn(async () => "replacement");
+      const replacement = runSystemAgentGatewayTask(replacementTask, new Map());
+      try {
+        await waitForTaskAdmission();
+        expect(replacementTask).not.toHaveBeenCalled();
+
+        releaseApply.resolve();
+        await expect(replacement).resolves.toBe("replacement");
+      } finally {
+        releaseApply.resolve();
+        await replacement.catch(() => undefined);
+      }
     });
   });
 });
