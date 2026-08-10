@@ -173,7 +173,7 @@ export class CustodianSessionStore {
       this.messages,
       this.dismissedQuestions,
       this.answeredQuestions,
-      this.wizardInputPending,
+      this.wizardInputPending || this.wizardSettling,
       this.questionReplyUncertain,
     );
   }
@@ -209,7 +209,15 @@ export class CustodianSessionStore {
     // Trim decides emptiness only; sensitive values may carry meaningful whitespace.
     const message = this.sensitive ? text : text.trim();
     const client = this.activeClient;
-    if (!message.trim() || !client || !this.chatAvailable || this.sending || this.setupRequired) {
+    if (
+      !message.trim() ||
+      !client ||
+      !this.chatAvailable ||
+      this.sending ||
+      this.setupRequired ||
+      this.wizardInputPending ||
+      this.wizardSettling
+    ) {
       this.emit();
       return "rejected";
     }
@@ -451,12 +459,7 @@ export class CustodianSessionStore {
     this.answeredQuestions = retireCustodianQuestions(this.messages, this.answeredQuestions);
     this.retryParams = null;
     this.input = "";
-    this.wizardValue = undefined;
-    this.wizardSecretVisible = false;
-    this.sensitive = false;
-    this.wizardInputPending = false;
-    this.wizardSettling = false;
-    this.questionReplyUncertain = false;
+    this.resetWizardInputState();
     this.error = null;
     this.setupIssue = null;
     this.earlierBoundaryAfterId = this.messages.at(-1)?.id ?? null;
@@ -616,6 +619,15 @@ export class CustodianSessionStore {
     this.emit();
   }
 
+  private resetWizardInputState(): void {
+    this.wizardValue = undefined;
+    this.wizardSecretVisible = false;
+    this.sensitive = false;
+    this.wizardInputPending = false;
+    this.wizardSettling = false;
+    this.questionReplyUncertain = false;
+  }
+
   private clearConversation(): void {
     this.qrScheduler.clear();
     this.messages = [];
@@ -625,12 +637,7 @@ export class CustodianSessionStore {
     this.error = null;
     this.setupIssue = null;
     this.input = "";
-    this.wizardValue = undefined;
-    this.wizardSecretVisible = false;
-    this.sensitive = false;
-    this.wizardInputPending = false;
-    this.wizardSettling = false;
-    this.questionReplyUncertain = false;
+    this.resetWizardInputState();
     this.earlierBoundaryAfterId = null;
   }
 

@@ -638,7 +638,8 @@ describe("custodian QR wizard step", () => {
       .mockResolvedValueOnce(pendingResult)
       .mockResolvedValueOnce(pendingResult)
       .mockResolvedValueOnce(terminalResult("Signal setup cancelled."));
-    const { page } = await mountPage(createContext(request).context);
+    const { context, emitGatewayEvent } = createContext(request);
+    const { page } = await mountPage(context, { onboarding: false });
     await vi.advanceTimersByTimeAsync(0);
 
     await vi.advanceTimersByTimeAsync(1_000);
@@ -647,6 +648,19 @@ describe("custodian QR wizard step", () => {
     expect(page.textContent).toContain("This QR code expired.");
     expect(page.store.wizardInputPending).toBe(false);
     expect(page.store.wizardSettling).toBe(true);
+    expect(page.store.messages.some((message) => message.step?.qrDataUrl)).toBe(false);
+
+    emitGatewayEvent({
+      event: "health",
+      payload: { channels: { telegram: { configured: true, healthState: "stale-socket" } } },
+    });
+    await page.updateComplete;
+    const nudge = page.querySelector<HTMLButtonElement>(".custodian__nudge-action");
+    expect(nudge).not.toBeNull();
+    expect(nudge?.disabled).toBe(true);
+    nudge?.click();
+    await expect(page.store.send("check health now")).resolves.toBe("rejected");
+    expect(request).toHaveBeenCalledTimes(2);
 
     await vi.advanceTimersByTimeAsync(1_000);
     expect(request.mock.calls.filter((call) => call[1]?.pollStepId === "qr-step")).toHaveLength(2);
@@ -661,5 +675,6 @@ describe("custodian QR wizard step", () => {
       wizardAnswer: { stepId: "qr-step", value: false },
     });
     await waitForFast(() => expect(page.textContent).toContain("Signal setup cancelled."));
+    expect(page.store.messages.some((message) => message.step?.qrDataUrl)).toBe(false);
   });
 });
