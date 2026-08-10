@@ -132,7 +132,7 @@ type SessionsToolOptions = {
   hasInProcessGatewayContext?: () => boolean;
 };
 
-function readBoolean(params: Record<string, unknown>, key: string): boolean | undefined {
+function readBooleanParam(params: Record<string, unknown>, key: string): boolean | undefined {
   const value = params[key];
   if (value === undefined) {
     return undefined;
@@ -287,7 +287,7 @@ export function createSessionsTool(opts: SessionsToolOptions = {}): AnyAgentTool
             archivedOnly: true,
             expectedSessionId,
             ...(expectedLifecycleRevision ? { expectedLifecycleRevision } : {}),
-            deleteTranscript: readBoolean(params, "deleteTranscript") ?? true,
+            deleteTranscript: readBooleanParam(params, "deleteTranscript") ?? true,
           }),
         );
       }
@@ -340,8 +340,10 @@ export function createSessionsTool(opts: SessionsToolOptions = {}): AnyAgentTool
         ...(params.ttlMinutes !== undefined
           ? { ttlMinutes: readInteger(params, "ttlMinutes") }
           : {}),
-        ...(params.pinned !== undefined ? { pinned: readBoolean(params, "pinned") } : {}),
-        ...(params.archived !== undefined ? { archived: readBoolean(params, "archived") } : {}),
+        ...(params.pinned !== undefined ? { pinned: readBooleanParam(params, "pinned") } : {}),
+        ...(params.archived !== undefined
+          ? { archived: readBooleanParam(params, "archived") }
+          : {}),
         ...(params.model !== undefined
           ? { model: readStringParam(params, "model", { required: true }) }
           : {}),
