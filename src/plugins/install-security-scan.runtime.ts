@@ -1,6 +1,7 @@
 // Runtime bridge for plugin install security scanning.
 import fs from "node:fs/promises";
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { sanitizeTerminalText } from "../../packages/terminal-core/src/safe-text.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { formatErrorMessage } from "../infra/errors.js";
@@ -776,7 +777,29 @@ async function runOperatorInstallPolicy(params: {
         targetType: params.targetType,
       });
     }
-    if (!reevaluated?.warning) {
+    if (reevaluated?.warning) {
+      const warningUnchanged =
+        reevaluated.warning.reason === result.warning.reason &&
+        isDeepStrictEqual(reevaluated.findings ?? [], result.findings ?? []);
+      if (!warningUnchanged) {
+        return {
+          blocked: {
+            code: "security_scan_blocked",
+            reason: formatInstallPolicyNotice({
+              decision: "warn",
+              findings: reevaluated.findings,
+              guidance: [
+                "The policy warning changed after approval.",
+                "Review the current warning and try again.",
+              ],
+              reason: reevaluated.warning.reason,
+              targetName: params.targetName,
+              targetType: params.targetType,
+            }),
+          },
+        };
+      }
+    } else {
       logPolicyResult(reevaluated);
     }
     return undefined;

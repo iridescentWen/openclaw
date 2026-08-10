@@ -322,7 +322,7 @@ describe("package dependency boundaries", () => {
 });
 
 describe("legacy file install scan compatibility", () => {
-  it("continues after interactive acknowledgement and policy re-evaluation", async () => {
+  it("continues after one acknowledgement and a fresh evaluation of the same warning", async () => {
     const onInstallPolicyWarning = vi.fn().mockResolvedValue(true);
     runInstallPolicyMock
       .mockResolvedValueOnce({ warning: { reason: "review this plugin" } })
@@ -341,6 +341,38 @@ describe("legacy file install scan compatibility", () => {
       targetType: "plugin",
       requestMode: "install",
     });
+    expect(runInstallPolicyMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("requires approval again when policy re-evaluation returns a changed warning", async () => {
+    const onInstallPolicyWarning = vi.fn().mockResolvedValue(true);
+    runInstallPolicyMock
+      .mockResolvedValueOnce({ warning: { reason: "review this plugin" } })
+      .mockResolvedValueOnce({
+        warning: { reason: "review the new finding" },
+        findings: [
+          {
+            ruleId: "changed-warning",
+            severity: "warn",
+            message: "new finding",
+          },
+        ],
+      });
+
+    const result = await scanFileInstallSourceRuntime({
+      filePath: "/tmp/payload.js",
+      logger: {},
+      onInstallPolicyWarning,
+      pluginId: "payload",
+    });
+
+    expect(result?.blocked).toMatchObject({
+      code: "security_scan_blocked",
+    });
+    expect(result?.blocked?.reason).toContain("Reason: review the new finding");
+    expect(result?.blocked?.reason).toContain("new finding");
+    expect(result?.blocked?.reason).toContain("The policy warning changed after approval.");
+    expect(onInstallPolicyWarning).toHaveBeenCalledTimes(1);
     expect(runInstallPolicyMock).toHaveBeenCalledTimes(2);
   });
 
