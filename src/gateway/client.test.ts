@@ -2441,7 +2441,9 @@ describe("GatewayClient connect auth payload", () => {
     const onHelloOk = vi.fn();
     const client = new GatewayClient({
       url: "ws://127.0.0.1:18789",
+      token: "shared-token",
       bootstrapToken: "bootstrap-token",
+      password: "shared-password", // pragma: allowlist secret
       preferBootstrapToken: true,
       onHelloOk,
     });
@@ -2463,6 +2465,7 @@ describe("GatewayClient connect auth payload", () => {
       token: "issued-device-token",
       deviceToken: "issued-device-token",
     });
+    expect(connectFrameFrom(reconnect).password).toBeUndefined();
     expect(connectFrameFrom(reconnect).bootstrapToken).toBeUndefined();
     client.stop();
   });
