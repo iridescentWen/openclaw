@@ -46,7 +46,30 @@ describe("install policy warning error details", () => {
       requestMode: "install",
       reason: "",
     },
+    {
+      ...expectedWarning,
+      findings: [{ ...completeWarning.findings?.[0], line: 0 }],
+    },
+    {
+      ...expectedWarning,
+      findings: [{ ...completeWarning.findings?.[0], severity: "error" }],
+    },
   ])("rejects malformed warning details", (value) => {
     expect(readInstallPolicyWarningErrorDetails(value)).toBeUndefined();
+  });
+
+  it("normalizes protocol strings without changing the published dependency surface", () => {
+    expect(
+      readInstallPolicyWarningErrorDetails({
+        ...expectedWarning,
+        targetName: " demo-plugin ",
+        reason: " Review required ",
+        acknowledgementToken: " token ",
+      }),
+    ).toMatchObject({
+      targetName: "demo-plugin",
+      reason: "Review required",
+      acknowledgementToken: "token",
+    });
   });
 });

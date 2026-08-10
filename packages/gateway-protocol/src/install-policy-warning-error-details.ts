@@ -1,4 +1,7 @@
-import { z } from "zod";
+import {
+  asProtocolRecord,
+  normalizeOptionalProtocolString,
+} from "./protocol-value-normalization.js";
 
 /** Structured install-policy warning details carried in Gateway error payloads. */
 export const INSTALL_POLICY_WARNING_ACKNOWLEDGEMENT_REQUIRED =
@@ -23,28 +26,84 @@ export type InstallPolicyWarningErrorDetails = {
   findings?: InstallPolicyWarningErrorFinding[];
 };
 
-const installPolicyWarningFindingSchema = z.object({
-  ruleId: z.string().trim().min(1),
-  severity: z.enum(["info", "warn", "critical"]),
-  message: z.string().trim().min(1),
-  file: z.string().trim().min(1).optional(),
-  line: z.number().int().positive().optional(),
-  evidence: z.string().trim().min(1).optional(),
-});
-
-const installPolicyWarningErrorDetailsSchema = z.object({
-  installPolicyCode: z.literal(INSTALL_POLICY_WARNING_ACKNOWLEDGEMENT_REQUIRED),
-  targetName: z.string().trim().min(1),
-  targetType: z.enum(["skill", "plugin"]),
-  requestMode: z.enum(["install", "update"]),
-  reason: z.string().trim().min(1),
-  acknowledgementToken: z.string().trim().min(1),
-  findings: z.array(installPolicyWarningFindingSchema).optional(),
-});
+function readFinding(value: unknown): InstallPolicyWarningErrorFinding | undefined {
+  const record = asProtocolRecord(value);
+  if (!record) {
+    return undefined;
+  }
+  const ruleId = normalizeOptionalProtocolString(record.ruleId);
+  const message = normalizeOptionalProtocolString(record.message);
+  const severity = record.severity;
+  if (
+    !ruleId ||
+    !message ||
+    (severity !== "info" && severity !== "warn" && severity !== "critical")
+  ) {
+    return undefined;
+  }
+  const file = normalizeOptionalProtocolString(record.file);
+  const evidence = normalizeOptionalProtocolString(record.evidence);
+  const line = record.line;
+  if (
+    (record.file !== undefined && !file) ||
+    (record.evidence !== undefined && !evidence) ||
+    (line !== undefined && (typeof line !== "number" || !Number.isSafeInteger(line) || line <= 0))
+  ) {
+    return undefined;
+  }
+  return {
+    ruleId,
+    severity,
+    message,
+    ...(file ? { file } : {}),
+    ...(line !== undefined ? { line } : {}),
+    ...(evidence ? { evidence } : {}),
+  };
+}
 
 export function readInstallPolicyWarningErrorDetails(
   value: unknown,
 ): InstallPolicyWarningErrorDetails | undefined {
-  const parsed = installPolicyWarningErrorDetailsSchema.safeParse(value);
-  return parsed.success ? parsed.data : undefined;
+  const record = asProtocolRecord(value);
+  if (!record) {
+    return undefined;
+  }
+  const targetName = normalizeOptionalProtocolString(record.targetName);
+  const reason = normalizeOptionalProtocolString(record.reason);
+  const acknowledgementToken = normalizeOptionalProtocolString(record.acknowledgementToken);
+  const targetType = record.targetType;
+  const requestMode = record.requestMode;
+  if (
+    record.installPolicyCode !== INSTALL_POLICY_WARNING_ACKNOWLEDGEMENT_REQUIRED ||
+    !targetName ||
+    !reason ||
+    !acknowledgementToken ||
+    (targetType !== "skill" && targetType !== "plugin") ||
+    (requestMode !== "install" && requestMode !== "update")
+  ) {
+    return undefined;
+  }
+  let findings: InstallPolicyWarningErrorFinding[] | undefined;
+  if (record.findings !== undefined) {
+    if (!Array.isArray(record.findings)) {
+      return undefined;
+    }
+    findings = [];
+    for (const value of record.findings) {
+      const finding = readFinding(value);
+      if (!finding) {
+        return undefined;
+      }
+      findings.push(finding);
+    }
+  }
+  return {
+    installPolicyCode: INSTALL_POLICY_WARNING_ACKNOWLEDGEMENT_REQUIRED,
+    targetName,
+    targetType,
+    requestMode,
+    reason,
+    acknowledgementToken,
+    ...(findings ? { findings } : {}),
+  };
 }
