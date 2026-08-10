@@ -6,66 +6,38 @@ import type {
   InstallPolicyWarningDetails,
   InstallPolicyWarningOccurrence,
 } from "../../plugins/install-security-scan.types.js";
-import type { ManagedPluginSourceInstallRequest } from "../../plugins/management-service.js";
 
 type InstallPolicyWarningScanIdentity = InstallPolicyWarningOccurrence["scan"];
+type ManagementServiceModule = typeof import("../../plugins/management-service.js");
 
 const managementMocks = vi.hoisted(() => {
-  class ManagedPluginLifecycleError extends Error {
-    readonly kind: "invalid-request" | "unavailable";
-    readonly code?: string;
-    readonly version?: string;
-    readonly warning?: string;
-    readonly installPolicyWarning?: InstallPolicyWarningOccurrence;
-    readonly installPolicyAcknowledgedWarnings?: InstallPolicyWarningOccurrence[];
-    readonly installPolicyResolvedRequest?: ManagedPluginSourceInstallRequest;
-
-    constructor(
-      message: string,
-      details?: {
-        kind?: "invalid-request" | "unavailable";
-        code?: string;
-        version?: string;
-        warning?: string;
-        installPolicyWarning?: InstallPolicyWarningOccurrence;
-        installPolicyAcknowledgedWarnings?: InstallPolicyWarningOccurrence[];
-        installPolicyResolvedRequest?: ManagedPluginSourceInstallRequest;
-      },
-    ) {
-      super(message);
-      this.kind = details?.kind ?? "invalid-request";
-      this.code = details?.code;
-      this.version = details?.version;
-      this.warning = details?.warning;
-      this.installPolicyWarning = details?.installPolicyWarning;
-      this.installPolicyAcknowledgedWarnings = details?.installPolicyAcknowledgedWarnings;
-      this.installPolicyResolvedRequest = details?.installPolicyResolvedRequest;
-    }
-  }
   return {
-    ManagedPluginLifecycleError,
-    install: vi.fn(),
-    list: vi.fn(),
-    setEnabled: vi.fn(),
-    uninstall: vi.fn(),
+    install: vi.fn<ManagementServiceModule["installManagedPlugin"]>(),
+    list: vi.fn<ManagementServiceModule["listManagedPlugins"]>(),
+    setEnabled: vi.fn<ManagementServiceModule["setManagedPluginEnabled"]>(),
+    uninstall: vi.fn<ManagementServiceModule["uninstallManagedPlugin"]>(),
   };
 });
 const searchMock = vi.hoisted(() => vi.fn());
 
-vi.mock("../../plugins/management-service.js", () => ({
-  ManagedPluginLifecycleError: managementMocks.ManagedPluginLifecycleError,
-  formatManagedPluginLifecycleError: (error: unknown) =>
-    error instanceof Error ? error.message : String(error),
-  installManagedPlugin: (...args: unknown[]) => managementMocks.install(...args),
-  listManagedPlugins: (...args: unknown[]) => managementMocks.list(...args),
-  setManagedPluginEnabled: (...args: unknown[]) => managementMocks.setEnabled(...args),
-  uninstallManagedPlugin: (...args: unknown[]) => managementMocks.uninstall(...args),
-}));
+vi.mock("../../plugins/management-service.js", async () => {
+  const actual = await vi.importActual<typeof import("../../plugins/management-service.js")>(
+    "../../plugins/management-service.js",
+  );
+  return {
+    ...actual,
+    installManagedPlugin: managementMocks.install,
+    listManagedPlugins: managementMocks.list,
+    setManagedPluginEnabled: managementMocks.setEnabled,
+    uninstallManagedPlugin: managementMocks.uninstall,
+  };
+});
 
 vi.mock("../../plugins/catalog-search.js", () => ({
   searchInstallablePluginPackages: (...args: unknown[]) => searchMock(...args),
 }));
 
+const { ManagedPluginLifecycleError } = await import("../../plugins/management-service.js");
 const { pluginsHandlers } = await import("./plugins.js");
 
 const packageScan: InstallPolicyWarningScanIdentity = {
@@ -279,7 +251,7 @@ describe("plugin management Gateway handlers", () => {
 
   it("classifies known enablement policy failures as invalid requests", async () => {
     managementMocks.setEnabled.mockRejectedValue(
-      new managementMocks.ManagedPluginLifecycleError("Plugin is blocked"),
+      new ManagedPluginLifecycleError("Plugin is blocked"),
     );
 
     const result = await callHandler("plugins.setEnabled", {
@@ -345,7 +317,7 @@ describe("plugin management Gateway handlers", () => {
 
   it("returns structured ClawHub acknowledgement details", async () => {
     managementMocks.install.mockRejectedValue(
-      new managementMocks.ManagedPluginLifecycleError("Review required", {
+      new ManagedPluginLifecycleError("Review required", {
         kind: "invalid-request",
         code: "clawhub_risk_acknowledgement_required",
         version: "1.2.3",
@@ -372,7 +344,7 @@ describe("plugin management Gateway handlers", () => {
 
   it("returns structured install-policy warning details", async () => {
     managementMocks.install.mockRejectedValue(
-      new managementMocks.ManagedPluginLifecycleError("Install requires approval", {
+      new ManagedPluginLifecycleError("Install requires approval", {
         installPolicyResolvedRequest: {
           source: "clawhub",
           spec: "clawhub:community/plugin@1.0.0",
@@ -429,7 +401,7 @@ describe("plugin management Gateway handlers", () => {
     expect(acknowledgementToken).toEqual(expect.any(String));
 
     managementMocks.install.mockRejectedValueOnce(
-      new managementMocks.ManagedPluginLifecycleError("Warning changed", {
+      new ManagedPluginLifecycleError("Warning changed", {
         installPolicyResolvedRequest: {
           source: "clawhub",
           spec: "clawhub:community/plugin@1.0.0",
@@ -535,7 +507,7 @@ describe("plugin management Gateway handlers", () => {
 
   it("binds an install-policy acknowledgement to the request that received it", async () => {
     managementMocks.install.mockRejectedValue(
-      new managementMocks.ManagedPluginLifecycleError("Install requires approval", {
+      new ManagedPluginLifecycleError("Install requires approval", {
         installPolicyResolvedRequest: {
           source: "official",
           spec: "@openclaw/diffs@1.0.0",
@@ -598,7 +570,7 @@ describe("plugin management Gateway handlers", () => {
       spec: "clawhub:community/plugin@1.0.0",
     };
     managementMocks.install.mockRejectedValueOnce(
-      new managementMocks.ManagedPluginLifecycleError("First warning", {
+      new ManagedPluginLifecycleError("First warning", {
         installPolicyResolvedRequest: resolvedRequest,
         installPolicyWarning: firstWarning,
       }),
@@ -618,7 +590,7 @@ describe("plugin management Gateway handlers", () => {
     );
 
     managementMocks.install.mockRejectedValueOnce(
-      new managementMocks.ManagedPluginLifecycleError("Second warning", {
+      new ManagedPluginLifecycleError("Second warning", {
         installPolicyResolvedRequest: resolvedRequest,
         installPolicyWarning: secondWarning,
         installPolicyAcknowledgedWarnings: [firstWarning],
@@ -662,7 +634,7 @@ describe("plugin management Gateway handlers", () => {
 
   it("classifies ClawHub security outages as unavailable", async () => {
     managementMocks.install.mockRejectedValue(
-      new managementMocks.ManagedPluginLifecycleError("Security service unavailable", {
+      new ManagedPluginLifecycleError("Security service unavailable", {
         kind: "unavailable",
         code: "clawhub_security_unavailable",
       }),
@@ -718,7 +690,7 @@ describe("plugin management Gateway handlers", () => {
 
   it("classifies bundled uninstall refusals as invalid requests", async () => {
     managementMocks.uninstall.mockRejectedValue(
-      new managementMocks.ManagedPluginLifecycleError(
+      new ManagedPluginLifecycleError(
         "bundled plugin cannot be uninstalled: workboard; disable it instead",
       ),
     );
