@@ -333,8 +333,9 @@ export class WizardSession {
   private stepDeferred: Deferred<WizardStep | null> | null = null;
   private pendingTerminalResolution = false;
   private cancellationLocked = false;
-  private qrPresentationOwned = false;
-  private qrPresentationHasExternalOwner = false;
+  private ownedQrStepIds = new Set<string>();
+  private externalQrOwnerStepIds = new Set<string>();
+  private settledExternalQrOwnerStepIds = new Set<string>();
   private readonly onQrPresentationOwnerSettled: ((stepId: string) => void) | undefined;
   private settled = false;
   private pendingExternalUrl: string | undefined;
@@ -373,7 +374,7 @@ export class WizardSession {
   }
 
   async next(): Promise<WizardNextResult> {
-    if (this.currentStep?.type === "qr" && this.qrPresentationHasExternalOwner) {
+    if (this.currentStep?.type === "qr" && this.externalQrOwnerStepIds.has(this.currentStep.id)) {
       // Give an already-settled owner callback one microtask to retire the QR before this poll
       // snapshots it. Otherwise a poll in the same turn can replay expired credential bytes.
       await Promise.resolve();
@@ -397,7 +398,7 @@ export class WizardSession {
       this.stepDeferred = createDeferred();
     }
     const step = await this.stepDeferred.promise;
-    if (step?.type === "qr" && this.qrPresentationHasExternalOwner) {
+    if (step?.type === "qr" && this.externalQrOwnerStepIds.has(step.id)) {
       // The owner may settle while the first consumer wakes; let its continuation
       // publish the next state before returning a QR that is already unusable.
       await Promise.resolve();
@@ -472,6 +473,9 @@ export class WizardSession {
     if (this.currentStep?.qrDataUrl) {
       delete this.currentStep.qrDataUrl;
     }
+    if (!this.externalQrOwnerStepIds.has(stepId)) {
+      this.ownedQrStepIds.delete(stepId);
+    }
     this.currentStep = null;
     pending.deferred.resolve(normalizedValue);
     return undefined;
@@ -491,6 +495,12 @@ export class WizardSession {
   dismissStep(stepId: string, result: { value: unknown } | { error: unknown }): boolean {
     // Owner settlement matters even after the client acknowledged the QR; the host may still
     // be enforcing the credential deadline while the runner applies the truthful owner result.
+    this.settledExternalQrOwnerStepIds.add(stepId);
+    if (this.currentStep && this.currentStep.id !== stepId) {
+      this.ownedQrStepIds.delete(stepId);
+      this.externalQrOwnerStepIds.delete(stepId);
+      this.settledExternalQrOwnerStepIds.delete(stepId);
+    }
     this.onQrPresentationOwnerSettled?.(stepId);
     const pending = this.answerDeferred.get(stepId);
     if (!pending) {
@@ -537,6 +547,9 @@ export class WizardSession {
     this.progressSteps = [];
     this.deliveredProgressStepIds.clear();
     this.dismissedStepIds.clear();
+    this.ownedQrStepIds.clear();
+    this.externalQrOwnerStepIds.clear();
+    this.settledExternalQrOwnerStepIds.clear();
     this.resolveStep(null);
     return true;
   }
@@ -552,17 +565,17 @@ export class WizardSession {
 
   /** Keep a wizard eviction-protected while its QR-owned operation is still in flight. */
   hasOwnedQrPresentation(): boolean {
-    return this.qrPresentationOwned && this.status === "running" && !this.settled;
+    return this.ownedQrStepIds.size > 0 && this.status === "running" && !this.settled;
   }
 
   /** True when a producer promise, rather than the acknowledgement, owns QR completion. */
   hasExternalQrPresentationOwner(): boolean {
-    return this.hasOwnedQrPresentation() && this.qrPresentationHasExternalOwner;
+    return this.externalQrOwnerStepIds.size > 0 && this.status === "running" && !this.settled;
   }
 
   /** Retire an expired credential while its external owner finishes or rejects the operation. */
   expireOwnedQrPresentation(stepId: string): boolean {
-    if (!this.hasExternalQrPresentationOwner()) {
+    if (!this.externalQrOwnerStepIds.has(stepId) || !this.hasExternalQrPresentationOwner()) {
       return false;
     }
     const pending = this.answerDeferred.get(stepId);
@@ -652,6 +665,9 @@ export class WizardSession {
       }
     } finally {
       this.settled = true;
+      this.ownedQrStepIds.clear();
+      this.externalQrOwnerStepIds.clear();
+      this.settledExternalQrOwnerStepIds.clear();
       if (this.expiryTimer) {
         clearTimeout(this.expiryTimer);
       }
@@ -667,11 +683,21 @@ export class WizardSession {
     if (this.status !== "running") {
       throw new Error("wizard: session not running");
     }
-    // A later interactive step proves the QR-owned operation finished. Release the
-    // eviction guard there; a runner stalled between steps remains protected by its QR timer.
-    this.qrPresentationOwned = Boolean(step.qrDataUrl);
-    this.qrPresentationHasExternalOwner =
-      this.qrPresentationOwned && qrPresentationHasExternalOwner;
+    // Once a settled QR owner emits its next step, it can no longer mutate state behind that
+    // step. Retire only those owners; unresolved owners stay protected across later prompts.
+    for (const stepId of this.settledExternalQrOwnerStepIds) {
+      this.ownedQrStepIds.delete(stepId);
+      this.externalQrOwnerStepIds.delete(stepId);
+    }
+    this.settledExternalQrOwnerStepIds.clear();
+    // Acknowledgement can let the producer emit another prompt before its QR owner settles.
+    // Keep ownership keyed to that QR so later prompts cannot drop its eviction guard.
+    if (step.type === "qr") {
+      this.ownedQrStepIds.add(step.id);
+      if (qrPresentationHasExternalOwner) {
+        this.externalQrOwnerStepIds.add(step.id);
+      }
+    }
     this.pushStep(step);
     const deferred = createDeferred<unknown>();
     this.answerDeferred.set(step.id, { deferred, text: step.type === "text", validate });

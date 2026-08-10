@@ -242,6 +242,37 @@ describe("WizardSession", () => {
     );
   });
 
+  test("retains external QR ownership across a subsequent prompt until its owner settles", async () => {
+    let settleOwner!: () => void;
+    const owner = new Promise<void>((resolve) => {
+      settleOwner = resolve;
+    });
+    const session = createQrSession(async (prompter) => {
+      await presentQr(prompter, owner);
+      await prompter.text({ message: "Device label" });
+    });
+
+    const prompt = await session.next();
+    if (!prompt.step) {
+      throw new Error("expected QR step");
+    }
+    await session.answer(prompt.step.id, true);
+
+    const next = await session.next();
+    expect(next.step).toMatchObject({ type: "text", message: "Device label" });
+    expect(session.hasExternalQrPresentationOwner()).toBe(true);
+    expect(session.hasOwnedQrPresentation()).toBe(true);
+
+    settleOwner();
+    await vi.waitFor(() => expect(session.hasExternalQrPresentationOwner()).toBe(false));
+    expect(session.hasOwnedQrPresentation()).toBe(false);
+    if (!next.step) {
+      throw new Error("expected text step");
+    }
+    await session.answer(next.step.id, "Work laptop");
+    await session.whenSettled();
+  });
+
   test("skips a QR step whose owner settled before its first presentation", async () => {
     const session = createQrSession(async (prompter) => {
       await presentQr(prompter, Promise.resolve());

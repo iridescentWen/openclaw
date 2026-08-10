@@ -1925,9 +1925,17 @@ export class SystemAgentChatEngine {
     }
     // The credential owner has a truthful result, but its runner may still be applying it.
     // Retire the stale QR step and replace its credential deadline with bounded runner ownership.
-    bridge.step = null;
+    if (bridge.step?.id === stepId) {
+      bridge.step = null;
+    }
     bridge.dismissedQrStepId = stepId;
     bridge.qrExpired = false;
+    if (bridge.step) {
+      // A later prompt proves the runner already applied this owner's result. Preserve that
+      // prompt and retire only the completed QR's deadline.
+      this.clearWizardExpiry(bridge);
+      return;
+    }
     this.armWizardRunnerExpiry(bridge, stepId);
   }
 
@@ -2125,7 +2133,9 @@ export class SystemAgentChatEngine {
       return `${label[0]?.toUpperCase() ?? "S"}${label.slice(1)} setup stopped: ${result.error ?? "unknown error"}`;
     }
     bridge.step = result.step ?? null;
-    this.clearWizardExpiry(bridge);
+    if (!bridge.session.hasExternalQrPresentationOwner()) {
+      this.clearWizardExpiry(bridge);
+    }
     if (bridge.step?.qrDataUrl) {
       this.armWizardQrExpiry(bridge);
     }
