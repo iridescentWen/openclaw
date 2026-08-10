@@ -1,9 +1,9 @@
 // Control UI tests cover event-reactive custodian presence against a mocked Gateway.
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import { GATEWAY_SERVER_CAPS } from "@openclaw/gateway-protocol";
 import type { Page } from "playwright";
 import { expect, it } from "vitest";
-import { GATEWAY_SERVER_CAPS } from "../../../packages/gateway-protocol/src/index.js";
 import { installMockGateway } from "../test-helpers/control-ui-e2e.ts";
 import { createControlUiE2eSuite } from "./control-ui-e2e-suite.test-support.ts";
 
@@ -586,6 +586,115 @@ suite.define(() => {
         expect(await page.locator(".agent-chat__composer-shell").count()).toBe(1);
       },
     );
+  });
+
+  it("restores a sensitive wizard blank and cancels it directly", async () => {
+    if (captureUiProofEnabled) {
+      await mkdir(uiProofArtifactDir, { recursive: true });
+    }
+    const context = await suite.newBrowserContext({
+      colorScheme: "dark",
+      locale: "en-US",
+      serviceWorkers: "block",
+      viewport: { height: 900, width: 1280 },
+    });
+    const page = await context.newPage();
+    const gateway = await installMockGateway(page, {
+      featureCapabilities: [
+        GATEWAY_SERVER_CAPS.SYSTEM_AGENT_WIZARD_CANCEL,
+        GATEWAY_SERVER_CAPS.SYSTEM_AGENT_CHAT_HISTORY_SESSION_RECOVERY,
+      ],
+      featureMethods: ["chat.metadata", "chat.startup", "openclaw.chat", "openclaw.chat.history"],
+      methodResponses: {
+        "openclaw.chat.history": { turns: [] },
+        "openclaw.chat": {
+          sessionId: "e2e-reload-wizard",
+          reply: "Enter the secret.",
+          action: "none",
+          sensitive: true,
+          wizardInputPending: true,
+          step: {
+            id: "secret",
+            type: "text",
+            message: "Twitch client secret",
+            sensitive: true,
+          },
+        },
+      },
+    });
+
+    try {
+      await page.goto(`${suite.server.baseUrl}custodian?onboarding=1`);
+      const secretInput = page.getByRole("textbox", { name: "Twitch client secret" });
+      await secretInput.waitFor();
+      await secretInput.fill("not-persisted");
+      expect(await page.getByRole("button", { name: "Cancel", exact: true }).count()).toBe(1);
+      expect(await page.getByRole("button", { name: "Exit setup", exact: true }).count()).toBe(1);
+
+      if (captureUiProofEnabled) {
+        await page.screenshot({
+          animations: "disabled",
+          path: path.join(uiProofArtifactDir, "03-sensitive-wizard-before-reload-desktop.png"),
+        });
+      }
+
+      await gateway.setMethodResponse("openclaw.chat.history", {
+        turns: [
+          { role: "user", text: "connect twitch", at: 1 },
+          { role: "assistant", text: "Enter the secret.", at: 2 },
+        ],
+        activeWizard: {
+          sessionId: "e2e-reload-wizard",
+          step: {
+            id: "secret",
+            type: "text",
+            message: "Twitch client secret",
+            sensitive: true,
+          },
+        },
+      });
+      await page.reload();
+
+      const recoveredInput = page.getByRole("textbox", { name: "Twitch client secret" });
+      await recoveredInput.waitFor();
+      expect(await recoveredInput.inputValue()).toBe("");
+      expect(await recoveredInput.getAttribute("type")).toBe("password");
+      expect(await gateway.getRequests("openclaw.chat")).toHaveLength(1);
+      expect(await page.getByRole("button", { name: "Cancel", exact: true }).count()).toBe(1);
+      expect(await page.getByRole("button", { name: "Exit setup", exact: true }).count()).toBe(1);
+
+      if (captureUiProofEnabled) {
+        await page.screenshot({
+          animations: "disabled",
+          path: path.join(uiProofArtifactDir, "04-sensitive-wizard-recovered-desktop.png"),
+        });
+        await page.setViewportSize({ height: 812, width: 375 });
+        await page.screenshot({
+          animations: "disabled",
+          path: path.join(uiProofArtifactDir, "05-sensitive-wizard-recovered-mobile.png"),
+        });
+        await page.setViewportSize({ height: 900, width: 1280 });
+      }
+
+      await gateway.setMethodResponse("openclaw.chat", {
+        sessionId: "e2e-reload-wizard",
+        reply: "Twitch setup cancelled.",
+        action: "none",
+      });
+      await page.getByRole("button", { name: "Cancel", exact: true }).click();
+      await page.getByText("Twitch setup cancelled.").waitFor();
+
+      const requests = await gateway.getRequests("openclaw.chat");
+      expect(requests).toHaveLength(2);
+      expect(requests[1]?.params).toMatchObject({
+        sessionId: "e2e-reload-wizard",
+        wizardCancel: { stepId: "secret" },
+      });
+      expect(requests[1]?.params).not.toHaveProperty("message");
+      expect(await page.locator(".custodian__wizard-step").count()).toBe(0);
+    } finally {
+      await suite.closeBrowserContext(context);
+    }
   });
 
   it("stays silent during onboarding", async () => {
