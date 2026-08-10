@@ -73,6 +73,17 @@ const lobsterPlugin = {
   install: { source: "clawhub", packageName: "@openclaw/lobster" },
 } satisfies PluginCatalogItem;
 
+const installedLobsterPlugin = {
+  ...lobsterPlugin,
+  packageName: "@openclaw/lobster",
+  version: "2026.8.10",
+  origin: "global",
+  installed: true,
+  enabled: true,
+  state: "enabled",
+  removable: true,
+} satisfies PluginCatalogItem;
+
 const remoteIconPlugin = {
   id: "remote-icon",
   name: "FireCrawl",
@@ -164,6 +175,21 @@ const installPolicyWarning = {
       message: "Semgrep found a risky command.",
       file: "index.ts",
       line: 12,
+    },
+  ],
+};
+
+const dependencyInstallPolicyWarning = {
+  ...installPolicyWarning,
+  reason: "ClawScan found a dependency issue to review.",
+  acknowledgementToken: "approval-token-2",
+  findings: [
+    {
+      ruleId: "dependency-finding",
+      severity: "warn",
+      message: "A dependency requires a second review.",
+      file: "package-lock.json",
+      line: 24,
     },
   ],
 };
@@ -721,6 +747,44 @@ describeControlUiE2e("Control UI Plugins mocked Gateway E2E", () => {
         packageName: "@openclaw/lobster",
         installPolicyWarningAcknowledgement: "approval-token",
       });
+      await gateway.rejectDeferred("plugins.install", {
+        code: "INVALID_REQUEST",
+        message: "raw dependency policy output",
+        details: dependencyInstallPolicyWarning,
+      });
+
+      await review.waitFor({ state: "visible" });
+      expect(await review.textContent()).toContain("A dependency requires a second review.");
+      expect(await review.textContent()).not.toContain("raw dependency policy output");
+      await captureScreenshot(page, "10-dependency-policy-review-desktop.png");
+
+      const installCountBeforeSecondRetry = (await gateway.getRequests("plugins.install")).length;
+      await gateway.deferNext("plugins.install");
+      await review.getByRole("button", { name: "Install anyway", exact: true }).click();
+      const secondRetry = await waitForNextRequest(
+        gateway,
+        "plugins.install",
+        installCountBeforeSecondRetry,
+      );
+      expect(requestParams(secondRetry)).toEqual({
+        source: "clawhub",
+        packageName: "@openclaw/lobster",
+        installPolicyWarningAcknowledgement: "approval-token-2",
+      });
+
+      await gateway.setMethodResponse(
+        "plugins.list",
+        inventory([workboardDisabled, installedLobsterPlugin, remoteIconPlugin]),
+      );
+      await gateway.resolveDeferred("plugins.install", {
+        ok: true,
+        plugin: installedLobsterPlugin,
+        restartRequired: true,
+      } satisfies PluginMutationResult);
+      await page
+        .locator('[data-plugin-id="lobster"][data-plugin-status="enabled"]')
+        .waitFor({ state: "visible" });
+      await review.waitFor({ state: "detached" });
     } finally {
       await context.close();
     }
