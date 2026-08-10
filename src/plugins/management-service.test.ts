@@ -1,6 +1,6 @@
 import { expectDefined } from "@openclaw/normalization-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { InstallPolicyWarningAcknowledgementRequest } from "./install-security-scan.types.js";
+import { expectOneShotInstallPolicyWarningAcknowledgement } from "./test-helpers/install-policy-warning.js";
 
 const mocks = vi.hoisted(() => ({
   applyUninstall: vi.fn(),
@@ -797,25 +797,7 @@ describe("plugin management service", () => {
         onInstallPolicyWarning: expect.any(Function),
       }),
     );
-    const installParams = expectDefined(
-      mocks.clawhubInstall.mock.calls[0],
-      "clawhub install call test invariant",
-    )[0] as {
-      onInstallPolicyWarning?: (
-        request: InstallPolicyWarningAcknowledgementRequest,
-      ) => Promise<boolean>;
-    };
-    const acknowledge = installParams.onInstallPolicyWarning;
-    if (!acknowledge) {
-      throw new Error("expected install-policy acknowledgement callback");
-    }
-    const warningRequest: InstallPolicyWarningAcknowledgementRequest = {
-      targetName: "diffs",
-      targetType: "plugin",
-      requestMode: "install",
-    };
-    expect(await acknowledge(warningRequest)).toBe(true);
-    expect(await acknowledge(warningRequest)).toBe(false);
+    await expectOneShotInstallPolicyWarningAcknowledgement(mocks.clawhubInstall);
   });
 
   it("removes only the newly installed managed target after persistence conflicts", async () => {
