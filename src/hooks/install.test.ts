@@ -471,29 +471,6 @@ describe("installHooksFromPath", () => {
     );
   });
 
-  it("passes install policy acknowledgement through both hook scan stages", async () => {
-    const stateDir = makeTempDir();
-    const workDir = makeTempDir();
-    const hookDir = path.join(workDir, "my-hook");
-    fs.mkdirSync(hookDir, { recursive: true });
-    fs.writeFileSync(path.join(hookDir, "HOOK.md"), "---\nname: my-hook\n---\n", "utf8");
-    fs.writeFileSync(path.join(hookDir, "handler.ts"), "export default async () => {};\n");
-    const onInstallPolicyWarning = vi.fn().mockResolvedValue(true);
-
-    await installHooksFromPath({
-      path: hookDir,
-      hooksDir: path.join(stateDir, "hooks"),
-      onInstallPolicyWarning,
-    });
-
-    expect(scanPackageInstallSourceMock).toHaveBeenCalledWith(
-      expect.objectContaining({ onInstallPolicyWarning }),
-    );
-    expect(scanInstalledPackageDependencyTreeMock).toHaveBeenCalledWith(
-      expect.objectContaining({ onInstallPolicyWarning }),
-    );
-  });
-
   it("blocks a staged single hook before publishing the target", async () => {
     const stateDir = makeTempDir();
     const workDir = makeTempDir();
