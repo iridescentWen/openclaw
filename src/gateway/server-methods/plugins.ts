@@ -40,7 +40,7 @@ type InstallPolicyAcknowledgement = {
   expiresAt: number;
   requestKey: string;
   resolvedRequest: ManagedPluginSourceInstallRequest;
-  warning: InstallPolicyWarningDetails;
+  warnings: InstallPolicyWarningDetails[];
 };
 
 const installPolicyAcknowledgements = new Map<string, InstallPolicyAcknowledgement>();
@@ -75,6 +75,7 @@ function issueInstallPolicyAcknowledgement(params: {
   request: PluginsInstallParams;
   resolvedRequest: ManagedPluginSourceInstallRequest;
   warning: InstallPolicyWarningDetails;
+  acknowledgedWarnings?: InstallPolicyWarningDetails[];
 }): string {
   const now = Date.now();
   pruneInstallPolicyAcknowledgements(now);
@@ -83,14 +84,14 @@ function issueInstallPolicyAcknowledgement(params: {
     expiresAt: now + INSTALL_POLICY_ACKNOWLEDGEMENT_TTL_MS,
     requestKey: installPolicyRequestKey(params.request),
     resolvedRequest: params.resolvedRequest,
-    warning: params.warning,
+    warnings: [...(params.acknowledgedWarnings ?? []), params.warning],
   });
   return token;
 }
 
 function consumeInstallPolicyAcknowledgement(
   request: PluginsInstallParams,
-): Pick<InstallPolicyAcknowledgement, "resolvedRequest" | "warning"> | undefined {
+): Pick<InstallPolicyAcknowledgement, "resolvedRequest" | "warnings"> | undefined {
   const token = request.installPolicyWarningAcknowledgement;
   if (!token) {
     return undefined;
@@ -108,7 +109,7 @@ function consumeInstallPolicyAcknowledgement(
   }
   return {
     resolvedRequest: acknowledgement.resolvedRequest,
-    warning: acknowledgement.warning,
+    warnings: acknowledgement.warnings,
   };
 }
 
@@ -255,6 +256,7 @@ export const pluginsHandlers: GatewayRequestHandlers = {
                 request: params,
                 resolvedRequest: lifecycleError.installPolicyResolvedRequest,
                 warning: lifecycleError.installPolicyWarning,
+                acknowledgedWarnings: lifecycleError.installPolicyAcknowledgedWarnings,
               }),
             })
           : undefined;

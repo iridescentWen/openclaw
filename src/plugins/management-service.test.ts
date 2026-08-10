@@ -802,6 +802,45 @@ describe("plugin management service", () => {
     await expectOneShotInstallPolicyWarningAcknowledgement(mocks.clawhubInstall);
   });
 
+  it("acknowledges each reviewed install-policy warning once", async () => {
+    mocks.readConfig.mockResolvedValue(configSnapshot());
+    mockHostedOfficialCatalog([hostedFeedDiffsEntry]);
+    mockClawHubInstall("diffs", "@openclaw/diffs");
+    mocks.persistInstall.mockResolvedValue({});
+    mocks.metadata.mockReturnValue(
+      metadataSnapshot({ enabled: true, id: "diffs", name: "Diffs", origin: "global" }),
+    );
+    const firstWarning = expectDefined(
+      officialDiffsWarningRequest.installPolicyWarningAcknowledgement.warnings[0],
+      "first approved warning",
+    );
+    const secondWarning = { ...firstWarning, reason: "Review the dependency warning" };
+
+    await installManagedPlugin({
+      request: {
+        ...officialDiffsWarningRequest,
+        installPolicyWarningAcknowledgement: {
+          ...officialDiffsWarningRequest.installPolicyWarningAcknowledgement,
+          warnings: [firstWarning, secondWarning],
+        },
+      },
+      env: {},
+    });
+
+    const call = expectDefined(mocks.clawhubInstall.mock.calls[0], "clawhub install call");
+    const acknowledge = expectDefined(
+      (
+        call[0] as {
+          onInstallPolicyWarning?: (request: { warning: typeof firstWarning }) => Promise<boolean>;
+        }
+      ).onInstallPolicyWarning,
+      "install-policy acknowledgement callback",
+    );
+    expect(await acknowledge({ warning: firstWarning })).toBe(true);
+    expect(await acknowledge({ warning: secondWarning })).toBe(true);
+    expect(await acknowledge({ warning: firstWarning })).toBe(false);
+  });
+
   it("removes only the newly installed managed target after persistence conflicts", async () => {
     const env = { HOME: "/tmp/openclaw-managed-install-conflict-home" };
     const conflict = new Error("config changed during plugin install");
