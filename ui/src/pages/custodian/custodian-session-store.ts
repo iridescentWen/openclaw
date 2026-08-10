@@ -738,6 +738,7 @@ export class CustodianSessionStore {
       if (pollStepId) {
         this.messages = scrubCustodianQrSteps(this.messages, pollStepId);
         this.questionReplyUncertain = false;
+        this.abandonedTurnOutcomeUnknown = false;
       }
       this.sensitive = result.sensitive === true;
       this.wizardInputPending = result.wizardInputPending === true;

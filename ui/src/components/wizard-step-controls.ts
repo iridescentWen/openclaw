@@ -92,6 +92,7 @@ function renderAnswerButton(
   label: string,
   onClick?: () => void,
   disabled = props.busy,
+  showLeadingAction = true,
 ) {
   const button = html`
     <button
@@ -106,7 +107,7 @@ function renderAnswerButton(
   if (props.presentation === "channels") {
     return html`<div class="channels-wizard__footer">${button}</div>`;
   }
-  return props.leadingAction
+  return showLeadingAction && props.leadingAction
     ? html`<div class="wizard-step__actions wizard-step__actions--split">
         ${props.leadingAction}${button}
       </div>`
@@ -194,8 +195,12 @@ function renderQrStep(props: WizardStepControlsProps) {
             >
               ${t("common.cancel")}
             </button>
-            ${renderAnswerButton(props, t("modelSetup.wizard.continue"), () =>
-              props.onAnswer(true),
+            ${renderAnswerButton(
+              props,
+              t("modelSetup.wizard.continue"),
+              () => props.onAnswer(true),
+              props.busy,
+              false,
             )}
           </div>`
       : html`<div class="muted" role="status">${t("custodian.setupQrCodeExpired")}</div>

@@ -68,27 +68,6 @@ describe("custodian QR wizard step", () => {
   });
 
   it("cancels QR setup through the typed wizard answer", async () => {
-    const request = vi
-      .fn()
-      .mockResolvedValueOnce(qrResult())
-      .mockResolvedValueOnce(terminalResult("Signal setup cancelled."));
-    const { page } = await mountPage(createContext(request).context);
-
-    await waitForFast(() => expect(page.querySelector(".wizard-step__qr")).not.toBeNull());
-    const cancelButton = Array.from(
-      page.querySelectorAll<HTMLButtonElement>(".custodian__wizard-step .btn"),
-    ).find((button) => button.textContent?.trim() === "Cancel");
-    cancelButton?.click();
-    await waitForFast(() => expect(request).toHaveBeenCalledTimes(2));
-
-    expect(request.mock.calls[1]?.[1]).toEqual({
-      sessionId: SESSION_ID,
-      wizardAnswer: { stepId: "qr-step", value: false },
-    });
-    await waitForFast(() => expect(page.textContent).toContain("Signal setup cancelled."));
-  });
-
-  it("pauses QR polling while direct wizard cancellation settles", async () => {
     vi.useFakeTimers();
     const request = vi
       .fn()
@@ -97,16 +76,20 @@ describe("custodian QR wizard step", () => {
     const { page } = await mountPage(createContext(request).context);
     await vi.advanceTimersByTimeAsync(0);
 
-    page.querySelector<HTMLButtonElement>(".custodian__wizard-cancel")?.click();
+    const cancelButtons = Array.from(
+      page.querySelectorAll<HTMLButtonElement>(".custodian__wizard-step .btn"),
+    ).filter((button) => button.textContent?.trim() === "Cancel");
+    expect(cancelButtons).toHaveLength(1);
+    cancelButtons[0]?.click();
     await vi.advanceTimersByTimeAsync(2_000);
     await page.updateComplete;
 
     expect(request).toHaveBeenCalledTimes(2);
     expect(request.mock.calls[1]?.[1]).toEqual({
       sessionId: SESSION_ID,
-      wizardCancel: { stepId: "qr-step" },
+      wizardAnswer: { stepId: "qr-step", value: false },
     });
-    expect(page.textContent).toContain("Signal setup cancelled.");
+    await waitForFast(() => expect(page.textContent).toContain("Signal setup cancelled."));
   });
 
   it.each([
@@ -527,6 +510,47 @@ describe("custodian QR wizard step", () => {
     expect(request).toHaveBeenCalledTimes(2);
     expect(request.mock.calls[1]?.[1]).toEqual({ sessionId: SESSION_ID, pollStepId: "qr-step" });
     expect(page.textContent).toContain("Signal is configured.");
+  });
+
+  it("clears an abandoned acknowledgement warning after terminal reconnect polling", async () => {
+    vi.useFakeTimers();
+    const pendingAcknowledgement = new Promise<never>(() => {});
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(qrResult())
+      .mockReturnValueOnce(pendingAcknowledgement)
+      .mockResolvedValueOnce(terminalResult());
+    const { context, setGatewaySnapshot } = createContext(request, ["openclaw.chat"], {
+      connectionId: "connection-1",
+      deviceId: "device-1",
+      processInstanceId: "gateway-process-1",
+    });
+    const { page } = await mountPage(context);
+    await vi.advanceTimersByTimeAsync(0);
+
+    page.querySelector<HTMLButtonElement>(".custodian__wizard-step .btn.primary")?.click();
+    await waitForFast(() => expect(request).toHaveBeenCalledTimes(2));
+    const hello = context.gateway.snapshot.hello;
+    if (!hello) {
+      throw new Error("expected connected Gateway hello");
+    }
+    setGatewaySnapshot({
+      client: {
+        request,
+        authenticatedDeviceId: "device-1",
+      } as unknown as GatewayBrowserClient,
+      hello: { ...hello, server: { connId: "connection-2" } },
+    });
+    await page.updateComplete;
+    expect(page.store.abandonedTurnOutcomeUnknown).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    await page.updateComplete;
+
+    expect(request.mock.calls[2]?.[1]).toEqual({ sessionId: SESSION_ID, pollStepId: "qr-step" });
+    expect(page.store.abandonedTurnOutcomeUnknown).toBe(false);
+    expect(page.textContent).toContain("Signal is configured.");
+    expect(page.textContent).not.toContain("The Gateway connection changed");
   });
 
   it.each([
