@@ -131,6 +131,30 @@ describe("OpenClaw chat history protocol", () => {
       }),
     ).toBe(true);
   });
+
+  it("accepts typed wizard-action metadata on durable user turns", () => {
+    const turn = {
+      role: "user",
+      text: "Slack bot",
+      at: 2,
+      sessionId: "slack-session",
+      wizardAction: {
+        kind: "answer",
+        step: {
+          id: "slack-mode",
+          type: "select",
+          message: "How should OpenClaw appear in Slack?",
+          options: [{ label: "Slack bot", value: "bot" }],
+        },
+      },
+    };
+    expect(Value.Check(SystemAgentChatHistoryResultSchema, { turns: [turn] })).toBe(true);
+    expect(
+      Value.Check(SystemAgentChatHistoryResultSchema, {
+        turns: [{ ...turn, wizardAction: { ...turn.wizardAction, kind: "unknown" } }],
+      }),
+    ).toBe(false);
+  });
 });
 
 describe("OpenClaw setup detection protocol", () => {

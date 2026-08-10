@@ -10239,21 +10239,29 @@ public struct SystemAgentChatHistoryTurn: Codable, Sendable {
     public let role: AnyCodable
     public let text: String
     public let at: Double
+    public let sessionid: String?
+    public let wizardaction: [String: AnyCodable]?
 
     public init(
         role: AnyCodable,
         text: String,
-        at: Double)
+        at: Double,
+        sessionid: String? = nil,
+        wizardaction: [String: AnyCodable]? = nil)
     {
         self.role = role
         self.text = text
         self.at = at
+        self.sessionid = sessionid
+        self.wizardaction = wizardaction
     }
 
     private enum CodingKeys: String, CodingKey {
         case role
         case text
         case at
+        case sessionid = "sessionId"
+        case wizardaction = "wizardAction"
     }
 }
 

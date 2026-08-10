@@ -34,8 +34,43 @@ describe("Custodian wizard reload recovery", () => {
         if (params.sessionId === "live-wizard" && !cancelled) {
           return {
             turns: [
-              { role: "user", text: "connect twitch", at: 1 },
-              { role: "assistant", text: "Enter the secret.", at: 2 },
+              { role: "user", text: "connect twitch", at: 1, sessionId: "live-wizard" },
+              {
+                role: "assistant",
+                text: [
+                  "How should OpenClaw appear in Twitch?",
+                  "1. Bot",
+                  "2. User",
+                  "Reply with a number.",
+                  "Say `cancel` to stop this setup.",
+                ].join("\n"),
+                at: 2,
+                sessionId: "live-wizard",
+              },
+              {
+                role: "user",
+                text: "Bot",
+                at: 3,
+                sessionId: "live-wizard",
+                wizardAction: {
+                  kind: "answer",
+                  step: {
+                    id: "identity",
+                    type: "select",
+                    message: "How should OpenClaw appear in Twitch?",
+                    options: [
+                      { label: "Bot", value: "bot" },
+                      { label: "User", value: "user" },
+                    ],
+                  },
+                },
+              },
+              {
+                role: "assistant",
+                text: "Enter the secret.\nType your answer.\nSay `cancel` to stop this setup.",
+                at: 4,
+                sessionId: "live-wizard",
+              },
             ],
             activeWizard: {
               sessionId: "live-wizard",
@@ -101,6 +136,12 @@ describe("Custodian wizard reload recovery", () => {
     });
     expect(recoveredInput.value).toBe("");
     expect(second.page.textContent).toContain("Enter the secret.");
+    expect(second.page.querySelectorAll(".custodian__structured-response")).toHaveLength(1);
+    expect(second.page.querySelector(".custodian__structured-response")?.textContent).toContain(
+      "Bot",
+    );
+    expect(second.page.querySelector(".chat-group.user")?.textContent).toContain("connect twitch");
+    expect(second.page.querySelector("details")).toBeNull();
     expect(request.mock.calls.filter(([method]) => method === "openclaw.chat")).toHaveLength(1);
 
     second.page.querySelector<HTMLButtonElement>(".custodian__wizard-cancel")!.click();
@@ -109,6 +150,8 @@ describe("Custodian wizard reload recovery", () => {
       sessionId: "live-wizard",
       wizardCancel: { stepId: "secret" },
     });
+    expect(second.page.querySelector(".chat-group.user")?.textContent).not.toContain("Cancel");
+    expect(second.page.querySelectorAll(".custodian__structured-response")).toHaveLength(2);
     expect(readCustodianRecoveryForClient(recoveryClient, gatewayUrl)).toBeNull();
 
     second.provider.remove();

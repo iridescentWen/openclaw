@@ -50,14 +50,8 @@ describe("custodian page", () => {
 
     await waitForFast(() => expect(request).toHaveBeenCalledOnce());
     await page.updateComplete;
-    const assistantGroup = page.querySelector<HTMLElement>(".chat-group.assistant")!;
-    expect(assistantGroup.querySelector("strong")?.textContent).toBe("aboard");
-    expect(
-      assistantGroup
-        .querySelector<HTMLImageElement>("img.chat-avatar.assistant")
-        ?.getAttribute("src"),
-    ).toBe("/favicon.svg");
-    // Onboarding strips the header identity; the thread avatar is the only mascot.
+    expect(page.querySelector(".chat-group.assistant")).toBeNull();
+    expect(page.textContent).not.toContain("Welcome aboard.");
     expect(page.querySelector(".custodian__mark openclaw-mascot")).toBeNull();
     const card = page.querySelector("openclaw-option-card")!;
     await card.updateComplete;
@@ -71,14 +65,15 @@ describe("custodian page", () => {
     await page.updateComplete;
     expect(request.mock.calls[0]?.[0]).toBe("openclaw.chat");
     expect(request.mock.calls[0]?.[1]).toMatchObject({ welcomeVariant: "onboarding" });
-    // LLM-authored option cards remain chat messages; wizard controls use wizardAnswer below.
     expect(request.mock.calls[1]?.[1]).toMatchObject({
       welcomeVariant: "onboarding",
       message: "connect whatsapp",
     });
-    const userGroup = page.querySelector<HTMLElement>(".chat-group.user")!;
-    expect(userGroup.textContent).toContain("Connect WhatsApp");
-    expect(connectOption.disabled).toBe(true);
+    expect(page.querySelector(".chat-group.user")).toBeNull();
+    expect(page.querySelector("openclaw-option-card")).toBeNull();
+    expect(page.querySelector(".custodian__structured-response")?.textContent).toContain(
+      "Connect WhatsApp",
+    );
   });
 
   it("renders and answers rich select, multiselect, and sensitive text wizard steps", async () => {
@@ -139,6 +134,7 @@ describe("custodian page", () => {
     await waitForFast(() =>
       expect(page.querySelectorAll('.custodian__wizard-step input[type="radio"]')).toHaveLength(5),
     );
+    expect(page.querySelector(".chat-group.assistant")).toBeNull();
     expect(page.querySelector("openclaw-option-card")).toBeNull();
     expect(page.querySelector(".agent-chat__composer-shell")).toBeNull();
     page
@@ -169,7 +165,9 @@ describe("custodian page", () => {
 
     await waitForFast(() => expect(request).toHaveBeenCalledTimes(3));
     const secretInput = await waitForFast(() => {
-      const input = page.querySelector<HTMLInputElement>("#custodian-wizard-input-5");
+      const input = page.querySelector<HTMLInputElement>(
+        '.custodian__wizard-step input[name="wizard-text"]',
+      );
       expect(input).not.toBeNull();
       return input!;
     });
@@ -183,7 +181,9 @@ describe("custodian page", () => {
     expect(revealSecret).not.toBeNull();
     revealSecret!.click();
     await page.updateComplete;
-    const revealedInput = page.querySelector<HTMLInputElement>("#custodian-wizard-input-5")!;
+    const revealedInput = page.querySelector<HTMLInputElement>(
+      '.custodian__wizard-step input[name="wizard-text"]',
+    )!;
     expect(revealedInput.type).toBe("text");
     revealedInput.value = "fake-client-secret";
     revealedInput.dispatchEvent(new Event("input", { bubbles: true }));
@@ -199,8 +199,83 @@ describe("custodian page", () => {
     expect(page.textContent).toContain("Twitch");
     expect(page.textContent).toContain("Chat, Announcements");
     expect(page.textContent).toContain("Sensitive reply sent");
+    expect(page.querySelectorAll(".custodian__structured-response")).toHaveLength(3);
+    expect(page.querySelector(".chat-group.user")).toBeNull();
     expect(page.textContent).not.toContain("fake-client-secret");
     expect(page.querySelector(".agent-chat__composer-shell")).not.toBeNull();
+  });
+
+  it("keeps Slack guidance visible in one typed card and formats its manifest", async () => {
+    const manifest = JSON.stringify(
+      {
+        display_information: {
+          name: "OpenClaw",
+          description: "OpenClaw connector for OpenClaw",
+        },
+      },
+      null,
+      2,
+    );
+    const question = "How do you want to provide this Slack bot token?";
+    const request = vi.fn().mockResolvedValue({
+      sessionId: "slack-wizard-session",
+      reply: [
+        [
+          "**Slack socket mode tokens**",
+          "1) Create the Slack app from the manifest below",
+          "2) Enable Socket Mode",
+        ].join("\n"),
+        manifest,
+        [
+          question,
+          "1. Enter Slack bot token — Stores the credential directly in OpenClaw config",
+          "2. Use external secret provider — Stores a reference to an external provider",
+          "Reply with a number.",
+          "Say `cancel` to stop this setup.",
+        ].join("\n"),
+      ].join("\n\n"),
+      action: "none",
+      wizardInputPending: true,
+      step: {
+        id: "slack-token-source",
+        type: "select",
+        message: question,
+        options: [
+          {
+            label: "Enter Slack bot token",
+            value: "direct",
+            hint: "Stores the credential directly in OpenClaw config",
+          },
+          {
+            label: "Use external secret provider",
+            value: "secret-ref",
+            hint: "Stores a reference to an external provider",
+          },
+        ],
+      },
+    });
+    const { context } = createContext(request);
+    const { page } = await mountPage(context);
+
+    await waitForFast(() =>
+      expect(page.querySelector(".custodian__wizard-guidance")).not.toBeNull(),
+    );
+    expect(page.querySelector(".chat-group.assistant")).toBeNull();
+    expect(page.querySelector("details")).toBeNull();
+    expect(page.querySelector(".custodian__wizard-guidance ol")).not.toBeNull();
+    expect(page.querySelector(".custodian__wizard-guidance .code-block-wrapper")).not.toBeNull();
+    const copyButton = page.querySelector<HTMLButtonElement>(
+      ".custodian__wizard-guidance .code-block-copy",
+    );
+    expect(copyButton).not.toBeNull();
+    copyButton?.click();
+    await waitForFast(() => expect(copyButton?.getAttribute("aria-label")).not.toBe("Copy code"));
+    expect(page.querySelector(".custodian__wizard-guidance")?.textContent).toContain(
+      "Slack socket mode tokens",
+    );
+    expect((page.textContent ?? "").split(question)).toHaveLength(2);
+    expect(page.textContent).not.toContain("Reply with a number");
+    expect(page.textContent).not.toContain("Say cancel");
   });
 
   it("keeps a typed cancel action visible beside every active wizard step", async () => {
@@ -245,6 +320,8 @@ describe("custodian page", () => {
     expect(request.mock.calls[1]?.[1]).not.toHaveProperty("message");
     await waitForFast(() => expect(page.textContent).toContain("Channel setup cancelled."));
     expect(page.querySelector(".custodian__wizard-step")).toBeNull();
+    expect(page.querySelector(".chat-group.user")).toBeNull();
+    expect(page.querySelector(".custodian__structured-response")?.textContent).toContain("Cancel");
     expect(page.querySelector(".agent-chat__composer-shell")).not.toBeNull();
   });
 
@@ -565,7 +642,8 @@ describe("custodian page", () => {
       "openclaw.chat",
     ]);
     expect(page.querySelector("openclaw-option-card")).not.toBeNull();
-    expect(page.textContent).toContain("Choose the next step.");
+    expect(page.textContent).toContain("What should happen next?");
+    expect(page.textContent).not.toContain("Choose the next step.");
   });
 
   it("requests a fresh welcome when a connected client is replaced mid-request", async () => {
@@ -792,7 +870,10 @@ describe("custodian page", () => {
     await waitForFast(() => expect(request).toHaveBeenCalledTimes(2));
     await page.updateComplete;
     expect(request.mock.calls[1]?.[1]).toMatchObject({ message: "cancel" });
-    expect(page.querySelector(".chat-group.user")?.textContent).toContain("Skip for now");
+    expect(page.querySelector(".chat-group.user")).toBeNull();
+    expect(page.querySelector(".custodian__structured-response")?.textContent).toContain(
+      "Skip for now",
+    );
     await waitForFast(() => expect(page.querySelector("openclaw-option-card")).toBeNull());
   });
 

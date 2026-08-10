@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { appendTranscriptTurn } from "../../system-agent/transcript-store.js";
 import { createDeferred } from "../../../test/helpers/promise.js";
-import { systemAgentChatHistoryHandler } from "./system-agent-chat-history.js";
+import {
+  captureSystemAgentWizardAction,
+  persistSystemAgentEngineHistory,
+  systemAgentChatHistoryHandler,
+} from "./system-agent-chat-history.js";
 import { runSystemAgentGatewayTask } from "./system-agent-gateway-queue.js";
 import { getSystemAgentSessionQueue } from "./system-agent-session-queue.js";
 import type { GatewayClient } from "./types.js";
@@ -11,10 +16,12 @@ const turns = [
 ];
 
 const transcriptStoreMocks = vi.hoisted(() => ({
+  appendTranscriptTurn: vi.fn(),
   readTranscriptTail: vi.fn(),
 }));
 
 vi.mock("../../system-agent/transcript-store.js", () => ({
+  appendTranscriptTurn: transcriptStoreMocks.appendTranscriptTurn,
   readTranscriptTail: transcriptStoreMocks.readTranscriptTail,
 }));
 
@@ -51,7 +58,54 @@ function makeInvocation(params: {
 
 describe("openclaw.chat.history wizard recovery", () => {
   beforeEach(() => {
+    transcriptStoreMocks.appendTranscriptTurn.mockReset();
     transcriptStoreMocks.readTranscriptTail.mockReset().mockReturnValue(turns);
+  });
+
+  it("captures the sanitized server-owned step for a typed answer", async () => {
+    const step = {
+      id: "slack-mode",
+      type: "select" as const,
+      message: "How should OpenClaw appear in Slack?",
+      options: [{ label: "Slack bot", value: "bot" }],
+    };
+
+    await expect(
+      captureSystemAgentWizardAction(
+        { activeWizardStep: vi.fn().mockResolvedValue(step) },
+        { sessionId: "slack-session", wizardAnswer: { stepId: step.id, value: "bot" } },
+      ),
+    ).resolves.toEqual({ kind: "answer", step });
+  });
+
+  it("persists session scope and action metadata on the matching user turn", () => {
+    const wizardAction = {
+      kind: "cancel" as const,
+      step: { id: "secret", type: "text" as const, message: "Twitch client secret" },
+    };
+    persistSystemAgentEngineHistory(
+      {
+        historySince: () => [
+          { role: "user", text: "Cancel" },
+          { role: "assistant", text: "Twitch setup cancelled." },
+        ],
+      },
+      0,
+      { sessionId: "twitch-session", wizardAction },
+    );
+
+    expect(vi.mocked(appendTranscriptTurn).mock.calls.map(([turn]) => turn)).toEqual([
+      expect.objectContaining({
+        role: "user",
+        sessionId: "twitch-session",
+        wizardAction,
+      }),
+      expect.objectContaining({
+        role: "assistant",
+        sessionId: "twitch-session",
+      }),
+    ]);
+    expect(vi.mocked(appendTranscriptTurn).mock.calls[1]?.[0]).not.toHaveProperty("wizardAction");
   });
 
   it("returns an active wizard only to its bound owner", async () => {

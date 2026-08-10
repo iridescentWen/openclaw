@@ -312,7 +312,9 @@ suite.define(() => {
           message: "cancel",
           sessionId: "e2e-wizard-custodian",
         });
-        await page.locator(".chat-group.user", { hasText: "Skip for now" }).waitFor();
+        await page
+          .locator(".custodian__structured-response", { hasText: "Skip for now" })
+          .waitFor();
         await page.getByText("Moving on.").waitFor();
         expect(await page.locator("openclaw-option-card").count()).toBe(0);
       },
@@ -535,15 +537,9 @@ suite.define(() => {
 
         await gateway.deferNext("openclaw.chat");
         await yesButton.click();
-        await expect.poll(() => noButton.isDisabled()).toBe(true);
-        await expect.poll(() => yesButton.isDisabled()).toBe(true);
-        await expect.poll(() => cancelButton.isDisabled()).toBe(true);
-        for (const button of [noButton, yesButton, cancelButton]) {
-          const restingStyle = await button.evaluate(readInteractionStyle);
-          await button.hover();
-          expect(await button.evaluate(readInteractionStyle)).toEqual(restingStyle);
-          expect(restingStyle.cursor).toBe("not-allowed");
-        }
+        await page.locator(".custodian__structured-response", { hasText: "Yes" }).waitFor();
+        expect(await noButton.count()).toBe(0);
+        expect(await yesButton.count()).toBe(0);
 
         await gateway.resolveDeferred("openclaw.chat", {
           sessionId: "e2e-rich-wizard",

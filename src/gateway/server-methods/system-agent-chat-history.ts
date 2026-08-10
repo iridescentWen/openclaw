@@ -1,12 +1,54 @@
-import { validateSystemAgentChatHistoryParams } from "../../../packages/gateway-protocol/src/index.js";
+import {
+  validateSystemAgentChatHistoryParams,
+  type SystemAgentChatHistoryWizardAction,
+  type SystemAgentChatParams,
+} from "../../../packages/gateway-protocol/src/index.js";
+import type { SystemAgentChatEngine } from "../../system-agent/chat-engine.js";
 import { resolveSystemAgentDelegationKey } from "../../system-agent/delegation-session.js";
-import { readTranscriptTail } from "../../system-agent/transcript-store.js";
+import { appendTranscriptTurn, readTranscriptTail } from "../../system-agent/transcript-store.js";
 import { runSystemAgentGatewayTask } from "./system-agent-gateway-queue.js";
 import { getSystemAgentSessionQueue } from "./system-agent-session-queue.js";
 import type { GatewayClient, GatewayRequestHandler } from "./types.js";
 import { assertValidParams } from "./validation.js";
 
 const DEFAULT_SYSTEM_AGENT_HISTORY_LIMIT = 100;
+
+export async function captureSystemAgentWizardAction(
+  engine: Pick<SystemAgentChatEngine, "activeWizardStep">,
+  input: SystemAgentChatParams,
+): Promise<SystemAgentChatHistoryWizardAction | undefined> {
+  const kind = input.wizardAnswer ? "answer" : input.wizardCancel ? "cancel" : undefined;
+  const stepId = input.wizardAnswer?.stepId ?? input.wizardCancel?.stepId;
+  if (!kind || !stepId) {
+    return undefined;
+  }
+  const step = await engine.activeWizardStep();
+  return step?.id === stepId ? { kind, step } : undefined;
+}
+
+export function persistSystemAgentEngineHistory(
+  engine: Pick<SystemAgentChatEngine, "historySince">,
+  startIndex: number,
+  params: {
+    sessionId: string;
+    wizardAction?: SystemAgentChatHistoryWizardAction;
+  },
+): void {
+  const at = Date.now();
+  let { wizardAction } = params;
+  for (const turn of engine.historySince(startIndex)) {
+    const action = turn.role === "user" ? wizardAction : undefined;
+    appendTranscriptTurn({
+      ...turn,
+      at,
+      sessionId: params.sessionId,
+      ...(action ? { wizardAction: action } : {}),
+    });
+    if (action) {
+      wizardAction = undefined;
+    }
+  }
+}
 
 export function resolveSystemAgentSessionOwnerKey(params: {
   delegation?: { agentId?: string; sessionKey?: string };

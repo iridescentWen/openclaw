@@ -1,5 +1,6 @@
 type MarkdownCodeBlockChrome = "copy" | "none";
 type MarkdownRenderMode = "document" | "message";
+type MarkdownJsonCodeBlockCollapse = "auto" | "never";
 
 export type MarkdownRenderOptions = {
   assistantTranscriptRoleHeaders?: boolean;
@@ -7,6 +8,7 @@ export type MarkdownRenderOptions = {
   fileLinks?: boolean;
   interactiveImages?: boolean;
   mode?: MarkdownRenderMode;
+  jsonCodeBlockCollapse?: MarkdownJsonCodeBlockCollapse;
 };
 
 export type MarkdownRenderEnv = Required<MarkdownRenderOptions>;
@@ -20,5 +22,6 @@ export function normalizeMarkdownRenderOptions(
     fileLinks: options.fileLinks ?? false,
     interactiveImages: options.interactiveImages ?? false,
     mode: options.mode ?? "message",
+    jsonCodeBlockCollapse: options.jsonCodeBlockCollapse ?? "auto",
   };
 }

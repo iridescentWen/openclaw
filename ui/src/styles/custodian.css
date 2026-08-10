@@ -267,12 +267,92 @@ openclaw-custodian-page {
 
 .custodian__wizard-step {
   display: grid;
-  gap: 12px;
+  gap: 16px;
   margin: 4px 16px 14px 46px;
   padding: 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--bg-elevated);
+}
+
+.custodian__wizard-guidance {
+  min-width: 0;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.custodian__wizard-guidance .chat-text {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.custodian__wizard-guidance .chat-text > :first-child {
+  margin-top: 0;
+}
+
+.custodian__wizard-guidance .chat-text > :last-child {
+  margin-bottom: 0;
+}
+
+.custodian__wizard-guidance .code-block-wrapper {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.custodian__wizard-guidance .code-block-copy {
+  cursor: pointer;
+}
+
+.custodian__wizard-guidance .code-block-wrapper pre {
+  max-height: min(38vh, 340px);
+}
+
+.custodian__structured-response {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin: 0 16px 14px 46px;
+  padding: 13px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+}
+
+.custodian__structured-response-icon {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+
+.custodian__structured-response-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.custodian__structured-response-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.custodian__structured-response-copy strong {
+  overflow-wrap: anywhere;
+  color: var(--text-strong);
+  font-size: 14px;
+}
+
+.custodian__structured-response-prompt {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .custodian__wizard-title {
@@ -518,7 +598,8 @@ openclaw-custodian-page {
 
 @media (max-width: 400px) {
   .custodian__option-card,
-  .custodian__wizard-step {
+  .custodian__wizard-step,
+  .custodian__structured-response {
     margin-left: 0;
   }
 }

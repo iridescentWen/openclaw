@@ -47,6 +47,10 @@ function shouldRenderCodeBlockCopy(env: unknown): boolean {
   return (env as Partial<MarkdownRenderEnv> | undefined)?.codeBlockChrome !== "none";
 }
 
+function shouldCollapseJsonCodeBlock(env: unknown): boolean {
+  return (env as Partial<MarkdownRenderEnv> | undefined)?.jsonCodeBlockCollapse !== "never";
+}
+
 function encodeBlockArtCodeBlockCopyPayload(value: string): string {
   return `${blockArtCopyPayloadPrefix}${JSON.stringify(value)}`;
 }
@@ -174,7 +178,7 @@ export function renderMarkdownCodeBlock(
       ((trimmed.startsWith("{") && trimmed.endsWith("}")) ||
         (trimmed.startsWith("[") && trimmed.endsWith("]"))));
 
-  if (isJson) {
+  if (isJson && shouldCollapseJsonCodeBlock(env)) {
     const lineCount = text.split("\n").length;
     const label =
       lineCount > 1

@@ -26,6 +26,18 @@ function renderCodeCopyButton(): HTMLButtonElement {
 }
 
 describe("Markdown code-block clipboard feedback", () => {
+  it("can keep JSON code blocks visible for instructional surfaces", () => {
+    document.body.innerHTML = toSanitizedMarkdownHtml('```json\n{"ok": true}\n```', {
+      jsonCodeBlockCollapse: "never",
+    });
+
+    expect(document.querySelector("details.json-collapse")).toBeNull();
+    expect(document.querySelector(".code-block-wrapper pre code")?.textContent).toBe(
+      '{"ok": true}\n',
+    );
+    expect(document.querySelector(".code-block-copy")).toBeInstanceOf(HTMLButtonElement);
+  });
+
   it("visibly reports both denied clipboard paths and restores the idle labels", async () => {
     vi.useFakeTimers();
     const writeText = vi.fn(async () => {
