@@ -6,6 +6,7 @@ type SystemAgentTranscriptEntry = {
   role: "user" | "assistant" | "reset";
   text: string;
   at: number;
+  sessionId?: string;
 };
 
 type SystemAgentTranscriptTurn = Omit<SystemAgentTranscriptEntry, "role"> & {
