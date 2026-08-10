@@ -106,7 +106,9 @@ anyway` (or `update anyway`). A matching answer evaluates the staged skill
 again before continuing. Declined and non-interactive commands stop before
 commit; after review, `--acknowledge-install-policy-warning` is the explicit
 noninteractive approval, and every approved warning is re-evaluated before
-continuing. `block` and policy failures remain terminal. The deprecated
+continuing. The flag is consumed by the first warning in one command; a later
+warning fails closed and requires interactive review. `block` and policy
+failures remain terminal. The deprecated
 `--dangerously-force-unsafe-install` flag remains a no-op.
 
 Notes:

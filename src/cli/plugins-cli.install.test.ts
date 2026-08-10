@@ -1639,7 +1639,24 @@ describe("plugins cli install", () => {
       "--acknowledge-install-policy-warning",
     ]);
 
-    expect(clawHubInstallCall().onInstallPolicyWarning).toEqual(expect.any(Function));
+    const acknowledgement = clawHubInstallCall().onInstallPolicyWarning;
+    if (typeof acknowledgement !== "function") {
+      throw new Error("expected ClawHub install-policy acknowledgement callback");
+    }
+    await expect(
+      acknowledgement({
+        targetName: "demo",
+        targetType: "plugin",
+        requestMode: "install",
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      acknowledgement({
+        targetName: "demo-dependency",
+        targetType: "plugin",
+        requestMode: "install",
+      }),
+    ).resolves.toBe(false);
   });
 
   it("does not report a ClawHub install when durable persistence fails", async () => {

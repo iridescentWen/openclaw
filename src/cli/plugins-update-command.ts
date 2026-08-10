@@ -342,6 +342,11 @@ async function runPluginUpdateCommandUnlocked(params: RunPluginUpdateCommandPara
     }
   }
 
+  const installPolicyWarningAcknowledgement = resolveInstallPolicyWarningAcknowledgementCliOptions({
+    acknowledgeInstallPolicyWarning: params.opts.acknowledgeInstallPolicyWarning,
+    dangerouslyForceUnsafeInstall: params.opts.dangerouslyForceUnsafeInstall,
+    allowPrompt: !params.opts.dryRun,
+  });
   const pluginResult =
     pluginSelection.pluginIds.length > 0
       ? await updateNpmInstalledPlugins({
@@ -353,11 +358,7 @@ async function runPluginUpdateCommandUnlocked(params: RunPluginUpdateCommandPara
           officialPluginUpdateChannel,
           syncOfficialPluginInstalls: params.opts.all ? true : undefined,
           coreVersion: VERSION,
-          ...resolveInstallPolicyWarningAcknowledgementCliOptions({
-            acknowledgeInstallPolicyWarning: params.opts.acknowledgeInstallPolicyWarning,
-            dangerouslyForceUnsafeInstall: params.opts.dangerouslyForceUnsafeInstall,
-            allowPrompt: !params.opts.dryRun,
-          }),
+          ...installPolicyWarningAcknowledgement,
           ...resolveClawHubRiskAcknowledgementCliOptions({
             acknowledgeClawHubRisk: params.opts.acknowledgeClawHubRisk,
             action: "updating",
@@ -384,11 +385,7 @@ async function runPluginUpdateCommandUnlocked(params: RunPluginUpdateCommandPara
     hookSelection.hookIds.length > 0
       ? await updateNpmInstalledHookPacks({
           config: pluginResult.config,
-          ...resolveInstallPolicyWarningAcknowledgementCliOptions({
-            acknowledgeInstallPolicyWarning: params.opts.acknowledgeInstallPolicyWarning,
-            dangerouslyForceUnsafeInstall: params.opts.dangerouslyForceUnsafeInstall,
-            allowPrompt: !params.opts.dryRun,
-          }),
+          ...installPolicyWarningAcknowledgement,
           hookIds: hookSelection.hookIds,
           specOverrides: hookSelection.specOverrides,
           dryRun: params.opts.dryRun,

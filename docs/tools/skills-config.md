@@ -183,6 +183,8 @@ same `install anyway` or `update anyway` copy as suspicious ClawHub releases,
 then run policy again before continuing. Declined and non-interactive commands
 may use `--acknowledge-install-policy-warning` as explicit approval after review;
 every approved warning is re-evaluated before continuing.
+The flag is consumed by the first warning in one command; a later warning
+fails closed and requires interactive review.
 Gateway-backed and automatic installs remain
 blocked on warnings because they have no operator-confirmation flow. The deprecated
 `--dangerously-force-unsafe-install` flag remains a no-op. A `block`, non-zero

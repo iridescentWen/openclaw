@@ -98,6 +98,13 @@ describe("resolveInstallPolicyWarningAcknowledgementCliOptions", () => {
         requestMode: "install",
       }),
     ).resolves.toBe(true);
+    await expect(
+      options.onInstallPolicyWarning?.({
+        targetName: "demo-dependency",
+        targetType: "plugin",
+        requestMode: "install",
+      }),
+    ).resolves.toBe(false);
     expect(promptTextMock).not.toHaveBeenCalled();
   });
 });

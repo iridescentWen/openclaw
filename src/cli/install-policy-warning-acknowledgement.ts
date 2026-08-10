@@ -18,10 +18,19 @@ export function resolveInstallPolicyWarningAcknowledgementCliOptions(params: {
     !params.acknowledgeInstallPolicyWarning &&
     params.allowPrompt !== false &&
     canPromptForInstallPolicyWarning();
+  let explicitAcknowledgementAvailable = params.acknowledgeInstallPolicyWarning === true;
   return {
     ...(params.dangerouslyForceUnsafeInstall ? { dangerouslyForceUnsafeInstall: true } : {}),
     ...(params.acknowledgeInstallPolicyWarning
-      ? { onInstallPolicyWarning: async () => true }
+      ? {
+          onInstallPolicyWarning: async () => {
+            if (!explicitAcknowledgementAvailable) {
+              return false;
+            }
+            explicitAcknowledgementAvailable = false;
+            return true;
+          },
+        }
       : canPrompt
         ? {
             onInstallPolicyWarning: async (request: InstallPolicyWarningAcknowledgementRequest) => {
