@@ -793,6 +793,13 @@ async function runOperatorInstallPolicy(params: {
         return {
           blocked: {
             code: "security_scan_blocked",
+            installPolicyWarning: {
+              targetName: params.targetName,
+              targetType: params.targetType,
+              requestMode: params.requestMode,
+              reason: reevaluated.warning.reason,
+              ...(reevaluated.findings?.length ? { findings: reevaluated.findings } : {}),
+            },
             reason: formatInstallPolicyNotice({
               decision: "warn",
               findings: reevaluated.findings,
@@ -810,8 +817,8 @@ async function runOperatorInstallPolicy(params: {
     } else {
       logPolicyResult(reevaluated);
     }
-    // Approval covers this warning only after a fresh evaluation. Callers that
-    // offer one-shot approval still reject warnings from later scan stages.
+    // Approval covers only an unchanged warning after a fresh evaluation.
+    // One-shot callers still reject later or changed warnings.
     return undefined;
   }
   if (acknowledgement.status === "unavailable") {
