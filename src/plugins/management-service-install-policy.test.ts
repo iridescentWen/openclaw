@@ -220,12 +220,17 @@ describe("plugin management install-policy acknowledgements", () => {
       "first approved warning",
     );
     const dependencyWarning: InstallPolicyWarningOccurrence = {
+      warningFingerprint: packageWarning.warningFingerprint,
       scan: {
         ...packageWarning.scan,
         originType: "plugin-dependency-tree",
         pluginContentType: "dependency-tree",
       },
       warning: packageWarning.warning,
+    };
+    const changedFingerprintWarning: InstallPolicyWarningOccurrence = {
+      ...packageWarning,
+      warningFingerprint: "changed-full-warning",
     };
 
     await installManagedPlugin({
@@ -252,6 +257,14 @@ describe("plugin management install-policy acknowledgements", () => {
     );
     expect(
       await acknowledge({
+        targetName: changedFingerprintWarning.warning.targetName,
+        targetType: changedFingerprintWarning.warning.targetType,
+        requestMode: changedFingerprintWarning.warning.requestMode,
+        ...changedFingerprintWarning,
+      }),
+    ).toEqual({ status: "unavailable", reason: "warning-not-approved" });
+    expect(
+      await acknowledge({
         targetName: dependencyWarning.warning.targetName,
         targetType: dependencyWarning.warning.targetType,
         requestMode: dependencyWarning.warning.requestMode,
@@ -273,6 +286,7 @@ describe("plugin management install-policy acknowledgements", () => {
 
   it("pins reviewed npm warnings to the first resolved version and integrity", async () => {
     const warning: InstallPolicyWarningOccurrence = {
+      warningFingerprint: "review-npm-package",
       scan: {
         requestKind: "plugin-npm",
         originType: "plugin-npm",
@@ -357,6 +371,7 @@ describe("plugin management install-policy acknowledgements", () => {
 
   it("keeps npm warnings terminal when immutable resolution metadata is incomplete", async () => {
     const warning: InstallPolicyWarningOccurrence = {
+      warningFingerprint: "review-npm-package",
       scan: {
         requestKind: "plugin-npm",
         originType: "plugin-npm",
@@ -411,6 +426,7 @@ describe("plugin management install-policy acknowledgements", () => {
 
   it("pins reviewed ClawHub warnings to the downloaded archive integrity", async () => {
     const warning: InstallPolicyWarningOccurrence = {
+      warningFingerprint: "review-clawhub-package",
       scan: {
         requestKind: "plugin-archive",
         originType: "plugin-package",

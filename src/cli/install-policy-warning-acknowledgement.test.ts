@@ -125,6 +125,7 @@ describe("resolveInstallPolicyWarningAcknowledgementCliOptions", () => {
       targetName: "demo",
       targetType: "plugin",
       requestMode: "install",
+      warningFingerprint: "review-required",
       scan: {
         requestKind: "plugin-npm",
         originType: "plugin-npm",
