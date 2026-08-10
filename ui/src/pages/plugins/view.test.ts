@@ -693,11 +693,21 @@ describe("renderPlugins", () => {
                 acknowledgementToken: "approval-token",
                 findings: [
                   {
+                    ruleId: "informational-finding",
+                    severity: "info",
+                    message: "The package declares a network integration.",
+                  },
+                  {
                     ruleId: "semgrep-finding",
                     severity: "warn",
                     message: "Semgrep found a risky command.",
                     file: "index.ts",
                     line: 12,
+                  },
+                  {
+                    ruleId: "critical-finding",
+                    severity: "critical",
+                    message: "The package executes an untrusted binary.",
                   },
                 ],
               },
@@ -716,9 +726,12 @@ describe("renderPlugins", () => {
     );
     const alert = expectDefined(row.querySelector('[role="alert"]'), "install policy warning");
     expect(normalizedText(alert)).toContain("Security review needed");
-    expect(normalizedText(alert)).toContain("Policy warnings: 1");
+    expect(normalizedText(alert)).toContain("Policy warnings: 3");
     expect(normalizedText(alert)).toContain("Not installed");
     expect(normalizedText(alert)).toContain("Findings");
+    expect(normalizedText(alert)).toContain("Info The package declares a network integration.");
+    expect(normalizedText(alert)).toContain("Warning Semgrep found a risky command.");
+    expect(normalizedText(alert)).toContain("Critical The package executes an untrusted binary.");
     expect(normalizedText(alert)).toContain("Semgrep found a risky command.");
     const technicalDetails = expectDefined(
       alert.querySelector<HTMLDetailsElement>(".plugins-policy-review__details"),

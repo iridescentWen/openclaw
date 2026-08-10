@@ -56,6 +56,7 @@ describe("readPluginInstallPolicyWarning", () => {
         targetType: "plugin",
         requestMode: "install",
         reason: "Review required.",
+        acknowledgementToken: "approval-token",
         findings: [{ ruleId: "finding", severity: "warn", message: 42 }],
       },
     });

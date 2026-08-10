@@ -55,6 +55,21 @@ export type PluginRowMessage = {
   };
 };
 
+type PluginInstallPolicyFinding = NonNullable<
+  PluginInstallPolicyWarningDetails["findings"]
+>[number];
+
+function policyFindingSeverityLabel(severity: PluginInstallPolicyFinding["severity"]): string {
+  switch (severity) {
+    case "info":
+      return t("pluginsPage.policyReviewSeverityInfo");
+    case "warn":
+      return t("pluginsPage.policyReviewSeverityWarn");
+    case "critical":
+      return t("pluginsPage.policyReviewSeverityCritical");
+  }
+}
+
 type PluginsViewProps = {
   connected: boolean;
   loading: boolean;
@@ -412,7 +427,19 @@ function renderRowMessage(
                   >${t("pluginsPage.policyReviewFindings")}</strong
                 >
                 <ul class="plugins-policy-review__findings">
-                  ${findings.map((finding) => html` <li>${finding.message}</li> `)}
+                  ${findings.map(
+                    (finding) => html`
+                      <li>
+                        <span class="plugins-policy-review__finding-content">
+                          <span
+                            class="plugins-policy-review__severity plugins-policy-review__severity--${finding.severity}"
+                            >${policyFindingSeverityLabel(finding.severity)}</span
+                          >
+                          <span>${finding.message}</span>
+                        </span>
+                      </li>
+                    `,
+                  )}
                 </ul>
               </section>
             `

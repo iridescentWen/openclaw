@@ -554,6 +554,33 @@ h3.plugins-subheader {
   margin-top: var(--space-2);
 }
 
+.plugins-policy-review__finding-content {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.plugins-policy-review__severity {
+  font-size: var(--control-ui-text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.plugins-policy-review__severity--info {
+  color: var(--muted);
+}
+
+.plugins-policy-review__severity--warn {
+  color: var(--warn);
+}
+
+.plugins-policy-review__severity--critical {
+  color: var(--danger);
+}
+
 .plugins-policy-review__details {
   margin-left: var(--plugins-policy-review-indent);
   color: var(--muted);

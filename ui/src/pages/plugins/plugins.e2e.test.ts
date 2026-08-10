@@ -186,7 +186,7 @@ const dependencyInstallPolicyWarning = {
   findings: [
     {
       ruleId: "dependency-finding",
-      severity: "warn",
+      severity: "critical",
       message: "A dependency requires a second review.",
       file: "package-lock.json",
       line: 24,
@@ -718,6 +718,7 @@ describeControlUiE2e("Control UI Plugins mocked Gateway E2E", () => {
       expect(await review.textContent()).toContain("Security review needed");
       expect(await review.textContent()).toContain("Policy warnings: 1");
       expect(await review.textContent()).toContain("Not installed");
+      expect(await review.textContent()).toContain("Warning");
       expect(await review.textContent()).toContain("Semgrep found a risky command.");
       expect(await review.textContent()).not.toContain("raw terminal install-policy output");
       await captureScreenshot(page, "09-policy-review-desktop.png");
@@ -754,6 +755,7 @@ describeControlUiE2e("Control UI Plugins mocked Gateway E2E", () => {
       });
 
       await review.waitFor({ state: "visible" });
+      expect(await review.textContent()).toContain("Critical");
       expect(await review.textContent()).toContain("A dependency requires a second review.");
       expect(await review.textContent()).not.toContain("raw dependency policy output");
       await captureScreenshot(page, "10-dependency-policy-review-desktop.png");
