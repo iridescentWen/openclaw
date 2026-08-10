@@ -11,6 +11,7 @@ describe("install policy warning error details", () => {
     targetType: "plugin",
     requestMode: "install",
     reason: "Scanner found behavior that needs review",
+    acknowledgementToken: "approval-token",
     findings: [
       {
         ruleId: "dynamic-eval",

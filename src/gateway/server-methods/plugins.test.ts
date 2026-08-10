@@ -3,6 +3,7 @@
 import { expectDefined } from "@openclaw/normalization-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { InstallPolicyWarningDetails } from "../../plugins/install-security-scan.types.js";
+import type { ManagedPluginSourceInstallRequest } from "../../plugins/management-service.js";
 
 const managementMocks = vi.hoisted(() => {
   class ManagedPluginLifecycleError extends Error {
@@ -11,6 +12,7 @@ const managementMocks = vi.hoisted(() => {
     readonly version?: string;
     readonly warning?: string;
     readonly installPolicyWarning?: InstallPolicyWarningDetails;
+    readonly installPolicyResolvedRequest?: ManagedPluginSourceInstallRequest;
 
     constructor(
       message: string,
@@ -20,6 +22,7 @@ const managementMocks = vi.hoisted(() => {
         version?: string;
         warning?: string;
         installPolicyWarning?: InstallPolicyWarningDetails;
+        installPolicyResolvedRequest?: ManagedPluginSourceInstallRequest;
       },
     ) {
       super(message);
@@ -28,6 +31,7 @@ const managementMocks = vi.hoisted(() => {
       this.version = details?.version;
       this.warning = details?.warning;
       this.installPolicyWarning = details?.installPolicyWarning;
+      this.installPolicyResolvedRequest = details?.installPolicyResolvedRequest;
     }
   }
   return {
@@ -304,24 +308,18 @@ describe("plugin management Gateway handlers", () => {
     });
   });
 
-  it("forwards explicit install-policy warning acknowledgement", async () => {
-    managementMocks.install.mockResolvedValue({
-      plugin: { ...workboard, id: "diffs", name: "Diffs", enabled: true, state: "enabled" },
-    });
-
-    await callHandler("plugins.install", {
+  it("rejects an install-policy acknowledgement that the Gateway did not issue", async () => {
+    const result = await callHandler("plugins.install", {
       source: "official",
       pluginId: "diffs",
-      acknowledgeInstallPolicyWarning: true,
+      installPolicyWarningAcknowledgement: "not-issued",
     });
 
-    expect(managementMocks.install).toHaveBeenCalledWith({
-      request: {
-        source: "official",
-        pluginId: "diffs",
-        acknowledgeInstallPolicyWarning: true,
-      },
+    expect(result.error).toMatchObject({
+      code: "INVALID_REQUEST",
+      message: expect.stringContaining("does not match this plugin"),
     });
+    expect(managementMocks.install).not.toHaveBeenCalled();
   });
 
   it("returns structured ClawHub acknowledgement details", async () => {
@@ -354,6 +352,10 @@ describe("plugin management Gateway handlers", () => {
   it("returns structured install-policy warning details", async () => {
     managementMocks.install.mockRejectedValue(
       new managementMocks.ManagedPluginLifecycleError("Install requires approval", {
+        installPolicyResolvedRequest: {
+          source: "clawhub",
+          spec: "clawhub:community/plugin@1.0.0",
+        },
         installPolicyWarning: {
           targetName: "demo-plugin",
           targetType: "plugin",
@@ -397,6 +399,147 @@ describe("plugin management Gateway handlers", () => {
         ],
       },
     });
+
+    const error = result.error as { details?: { acknowledgementToken?: unknown } };
+    const acknowledgementToken = expectDefined(
+      error.details?.acknowledgementToken,
+      "expected install-policy acknowledgement token",
+    );
+    expect(acknowledgementToken).toEqual(expect.any(String));
+
+    managementMocks.install.mockRejectedValueOnce(
+      new managementMocks.ManagedPluginLifecycleError("Warning changed", {
+        installPolicyResolvedRequest: {
+          source: "clawhub",
+          spec: "clawhub:community/plugin@1.0.0",
+        },
+        installPolicyWarning: {
+          targetName: "demo-plugin",
+          targetType: "plugin",
+          requestMode: "install",
+          reason: "Scanner found a different issue",
+        },
+      }),
+    );
+    const changed = await callHandler("plugins.install", {
+      source: "clawhub",
+      packageName: "community/plugin",
+      installPolicyWarningAcknowledgement: acknowledgementToken,
+    });
+
+    expect(changed.error).toMatchObject({
+      details: { reason: "Scanner found a different issue" },
+    });
+    expect(managementMocks.install).toHaveBeenLastCalledWith({
+      request: {
+        source: "clawhub",
+        packageName: "community/plugin",
+        installPolicyWarningAcknowledgement: {
+          resolvedRequest: {
+            source: "clawhub",
+            spec: "clawhub:community/plugin@1.0.0",
+          },
+          warning: {
+            targetName: "demo-plugin",
+            targetType: "plugin",
+            requestMode: "install",
+            reason: "Scanner found behavior that needs review",
+            findings: [
+              {
+                ruleId: "dynamic-eval",
+                severity: "warn",
+                message: "Dynamic code execution",
+                file: "index.js",
+                line: 12,
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    const changedError = changed.error as { details?: { acknowledgementToken?: unknown } };
+    const changedAcknowledgementToken = expectDefined(
+      changedError.details?.acknowledgementToken,
+      "expected changed-warning acknowledgement token",
+    );
+    expect(changedAcknowledgementToken).not.toBe(acknowledgementToken);
+
+    managementMocks.install.mockResolvedValue({
+      plugin: { ...workboard, id: "diffs", name: "Diffs", enabled: true, state: "enabled" },
+    });
+    const approved = await callHandler("plugins.install", {
+      source: "clawhub",
+      packageName: "community/plugin",
+      installPolicyWarningAcknowledgement: changedAcknowledgementToken,
+    });
+    expect(approved.ok).toBe(true);
+    expect(managementMocks.install).toHaveBeenLastCalledWith({
+      request: {
+        source: "clawhub",
+        packageName: "community/plugin",
+        installPolicyWarningAcknowledgement: {
+          resolvedRequest: {
+            source: "clawhub",
+            spec: "clawhub:community/plugin@1.0.0",
+          },
+          warning: {
+            targetName: "demo-plugin",
+            targetType: "plugin",
+            requestMode: "install",
+            reason: "Scanner found a different issue",
+          },
+        },
+      },
+    });
+
+    const replay = await callHandler("plugins.install", {
+      source: "clawhub",
+      packageName: "community/plugin",
+      installPolicyWarningAcknowledgement: changedAcknowledgementToken,
+    });
+    expect(replay.error).toMatchObject({ code: "INVALID_REQUEST" });
+    expect(managementMocks.install).toHaveBeenCalledTimes(3);
+  });
+
+  it("binds an install-policy acknowledgement to the request that received it", async () => {
+    managementMocks.install.mockRejectedValue(
+      new managementMocks.ManagedPluginLifecycleError("Install requires approval", {
+        installPolicyResolvedRequest: {
+          source: "official",
+          spec: "@openclaw/diffs@1.0.0",
+          pluginId: "diffs",
+          mode: "install",
+        },
+        installPolicyWarning: {
+          targetName: "diffs",
+          targetType: "plugin",
+          requestMode: "install",
+          reason: "Review required",
+        },
+      }),
+    );
+    const warning = await callHandler("plugins.install", {
+      source: "official",
+      pluginId: "diffs",
+    });
+    const error = warning.error as { details?: { acknowledgementToken?: unknown } };
+    const acknowledgementToken = expectDefined(
+      error.details?.acknowledgementToken,
+      "expected install-policy acknowledgement token",
+    );
+
+    const mismatch = await callHandler("plugins.install", {
+      source: "official",
+      pluginId: "workboard",
+      installPolicyWarningAcknowledgement: acknowledgementToken,
+    });
+
+    expect(mismatch.error).toMatchObject({
+      code: "INVALID_REQUEST",
+      message: expect.stringContaining("does not match this plugin"),
+    });
+    expect(managementMocks.install).toHaveBeenCalledOnce();
   });
 
   it("classifies ClawHub security outages as unavailable", async () => {

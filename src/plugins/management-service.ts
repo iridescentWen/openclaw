@@ -1,5 +1,6 @@
 // Structured plugin catalog and lifecycle operations shared by Gateway-facing surfaces.
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { asSafeIntegerInRange } from "@openclaw/normalization-core/number-coercion";
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
 import { uniqueStrings } from "@openclaw/normalization-core/string-normalization";
@@ -117,18 +118,24 @@ type ManagedPluginCatalog = {
   mutationAllowed: boolean;
 };
 
-type ManagedPluginInstallRequest =
+export type ManagedPluginInstallRequest =
   | {
       source: "clawhub";
       packageName: string;
       version?: string;
       acknowledgeClawHubRisk?: boolean;
-      acknowledgeInstallPolicyWarning?: boolean;
+      installPolicyWarningAcknowledgement?: {
+        warning: InstallPolicyWarningDetails;
+        resolvedRequest: ManagedPluginSourceInstallRequest;
+      };
     }
   | {
       source: "official";
       pluginId: string;
-      acknowledgeInstallPolicyWarning?: boolean;
+      installPolicyWarningAcknowledgement?: {
+        warning: InstallPolicyWarningDetails;
+        resolvedRequest: ManagedPluginSourceInstallRequest;
+      };
     };
 
 export type ManagedPluginSourceInstallRequest =
@@ -223,6 +230,7 @@ export class ManagedPluginLifecycleError extends Error {
   readonly version?: string;
   readonly warning?: string;
   readonly installPolicyWarning?: InstallPolicyWarningDetails;
+  readonly installPolicyResolvedRequest?: ManagedPluginSourceInstallRequest;
 
   constructor(
     message: string,
@@ -232,6 +240,7 @@ export class ManagedPluginLifecycleError extends Error {
       version?: string;
       warning?: string;
       installPolicyWarning?: InstallPolicyWarningDetails;
+      installPolicyResolvedRequest?: ManagedPluginSourceInstallRequest;
       cause?: unknown;
     },
   ) {
@@ -242,6 +251,7 @@ export class ManagedPluginLifecycleError extends Error {
     this.version = details?.version;
     this.warning = details?.warning;
     this.installPolicyWarning = details?.installPolicyWarning;
+    this.installPolicyResolvedRequest = details?.installPolicyResolvedRequest;
   }
 }
 
@@ -990,13 +1000,27 @@ function buildClawHubSpec(packageName: string, version?: string): string {
   return `clawhub:${packageName}${version ? `@${version}` : ""}`;
 }
 
-function throwInstallFailure(result: {
-  error: string;
-  code?: string;
-  version?: string;
-  warning?: string;
-  installPolicyWarning?: InstallPolicyWarningDetails;
-}): never {
+function pinInstallPolicyResolvedRequest(
+  request: ManagedPluginSourceInstallRequest,
+  version: string | undefined,
+): ManagedPluginSourceInstallRequest {
+  if (request.source !== "clawhub" || !version) {
+    return request;
+  }
+  const parsed = parseClawHubPluginSpec(request.spec);
+  return parsed ? { ...request, spec: buildClawHubSpec(parsed.name, version) } : request;
+}
+
+function throwInstallFailure(
+  result: {
+    error: string;
+    code?: string;
+    version?: string;
+    warning?: string;
+    installPolicyWarning?: InstallPolicyWarningDetails;
+  },
+  resolvedRequest?: ManagedPluginSourceInstallRequest,
+): never {
   const unavailable =
     !result.code ||
     result.code === CLAWHUB_INSTALL_ERROR_CODE.ARTIFACT_UNAVAILABLE ||
@@ -1008,6 +1032,14 @@ function throwInstallFailure(result: {
     version: result.version,
     warning: result.warning,
     installPolicyWarning: result.installPolicyWarning,
+    ...(result.installPolicyWarning && resolvedRequest
+      ? {
+          installPolicyResolvedRequest: pinInstallPolicyResolvedRequest(
+            resolvedRequest,
+            result.version,
+          ),
+        }
+      : {}),
     cause: result,
   });
 }
@@ -1085,6 +1117,7 @@ function throwPersistenceFailureWithCleanupWarnings(error: unknown, warnings: st
       version: error.version,
       warning: [error.warning, cleanupWarning].filter(Boolean).join("\n"),
       installPolicyWarning: error.installPolicyWarning,
+      installPolicyResolvedRequest: error.installPolicyResolvedRequest,
       cause: error,
     });
   }
@@ -1435,10 +1468,11 @@ export async function installManagedPlugin(params: {
     const warnings: string[] = [];
     const installLogger = createInstallLogger(warnings);
     let installPolicyWarningAcknowledgementAvailable = Boolean(
-      params.request.acknowledgeInstallPolicyWarning,
+      params.request.installPolicyWarningAcknowledgement,
     );
     const request =
-      params.request.source === "clawhub"
+      params.request.installPolicyWarningAcknowledgement?.resolvedRequest ??
+      (params.request.source === "clawhub"
         ? resolveManagedClawHubInstallRequest({
             request: params.request,
             officialEntries: officialCatalog.entries,
@@ -1446,22 +1480,25 @@ export async function installManagedPlugin(params: {
         : resolveManagedOfficialInstallRequest({
             request: params.request,
             officialEntries: officialCatalog.entries,
-          });
+          }));
     const installed = await installManagedPluginSource({
       request,
       snapshot,
       env,
       logger: installLogger,
       persistenceLogger: installLogger,
-      ...(params.request.acknowledgeInstallPolicyWarning
+      ...(params.request.installPolicyWarningAcknowledgement
         ? {
             safetyOverrides: {
-              onInstallPolicyWarning: async () => {
+              onInstallPolicyWarning: async ({ warning }) => {
                 if (!installPolicyWarningAcknowledgementAvailable) {
                   return false;
                 }
                 installPolicyWarningAcknowledgementAvailable = false;
-                return true;
+                return isDeepStrictEqual(
+                  warning,
+                  params.request.installPolicyWarningAcknowledgement?.warning,
+                );
               },
             },
           }
@@ -1471,7 +1508,7 @@ export async function installManagedPlugin(params: {
       runtime: createSilentRuntime(),
     });
     if (!installed.ok) {
-      return throwInstallFailure(installed);
+      return throwInstallFailure(installed, request);
     }
     const catalog = await listManagedPlugins({
       config: installed.config,

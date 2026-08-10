@@ -14,6 +14,7 @@ export type InstallPolicyWarningAcknowledgementRequest = {
   targetName: string;
   targetType: "skill" | "plugin";
   requestMode: "install" | "update";
+  warning: InstallPolicyWarningDetails;
 };
 
 type InstallPolicyWarningAcknowledgementResult =
