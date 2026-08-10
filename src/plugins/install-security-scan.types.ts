@@ -11,7 +11,7 @@ export type InstallPolicyWarningDetails = {
 };
 
 /** Stable policy-stage facts that scope an approval without exposing scan internals to clients. */
-export type InstallPolicyWarningScanIdentity = {
+type InstallPolicyWarningScanIdentity = {
   requestKind: InstallPolicyRequestKind;
   originType: string;
   pluginContentType?: "bundle" | "package" | "file" | "dependency-tree";
