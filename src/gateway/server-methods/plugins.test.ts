@@ -50,7 +50,7 @@ function warningOccurrence(
   warning: InstallPolicyWarningDetails,
   scan: InstallPolicyWarningScanIdentity = packageScan,
 ): InstallPolicyWarningOccurrence {
-  return { scan, warning };
+  return { scan, warning, warningFingerprint: `fingerprint:${warning.reason}` };
 }
 
 async function callHandler(
@@ -435,6 +435,7 @@ describe("plugin management Gateway handlers", () => {
           warnings: [
             {
               scan: packageScan,
+              warningFingerprint: "fingerprint:Scanner found behavior that needs review",
               warning: {
                 targetName: "demo-plugin",
                 targetType: "plugin",
@@ -484,6 +485,7 @@ describe("plugin management Gateway handlers", () => {
           warnings: [
             {
               scan: packageScan,
+              warningFingerprint: "fingerprint:Scanner found a different issue",
               warning: {
                 targetName: "demo-plugin",
                 targetType: "plugin",
@@ -588,6 +590,9 @@ describe("plugin management Gateway handlers", () => {
     expect((first.error as { details?: Record<string, unknown> }).details).not.toHaveProperty(
       "scan",
     );
+    expect((first.error as { details?: Record<string, unknown> }).details).not.toHaveProperty(
+      "warningFingerprint",
+    );
 
     managementMocks.install.mockRejectedValueOnce(
       new ManagedPluginLifecycleError("Second warning", {
@@ -609,6 +614,9 @@ describe("plugin management Gateway handlers", () => {
     expect(second.error).toMatchObject({ details: publicWarningDetails });
     expect((second.error as { details?: Record<string, unknown> }).details).not.toHaveProperty(
       "scan",
+    );
+    expect((second.error as { details?: Record<string, unknown> }).details).not.toHaveProperty(
+      "warningFingerprint",
     );
 
     managementMocks.install.mockResolvedValueOnce({

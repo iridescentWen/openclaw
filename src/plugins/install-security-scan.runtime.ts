@@ -760,6 +760,7 @@ async function runOperatorInstallPolicy(params: {
       ...(params.skill ? { skillInstallId: params.skill.installId } : {}),
     },
     warning: installPolicyWarning,
+    warningFingerprint: result.warning.fingerprint,
   };
   if (!params.onInstallPolicyWarning) {
     return {
@@ -813,6 +814,7 @@ async function runOperatorInstallPolicy(params: {
                 reason: reevaluated.warning.reason,
                 ...(reevaluated.findings?.length ? { findings: reevaluated.findings } : {}),
               },
+              warningFingerprint: reevaluated.warning.fingerprint,
             },
             reason: formatInstallPolicyNotice({
               decision: "warn",

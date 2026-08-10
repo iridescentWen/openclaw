@@ -1533,11 +1533,10 @@ export async function installManagedPlugin(params: {
       ...(params.request.installPolicyWarningAcknowledgement
         ? {
             safetyOverrides: {
-              onInstallPolicyWarning: async ({ scan, warning }) => {
-                const warningIndex = remainingInstallPolicyWarnings.findIndex(
-                  (approved) =>
-                    isDeepStrictEqual(scan, approved.scan) &&
-                    isDeepStrictEqual(warning, approved.warning),
+              onInstallPolicyWarning: async ({ scan, warning, warningFingerprint }) => {
+                const currentWarning = { scan, warning, warningFingerprint };
+                const warningIndex = remainingInstallPolicyWarnings.findIndex((approved) =>
+                  isDeepStrictEqual(currentWarning, approved),
                 );
                 if (warningIndex < 0) {
                   return { status: "unavailable", reason: "warning-not-approved" };

@@ -344,6 +344,7 @@ describe("legacy file install scan compatibility", () => {
       targetName: "payload",
       targetType: "plugin",
       requestMode: "install",
+      warningFingerprint: "warning-a",
       scan: {
         requestKind: "plugin-file",
         originType: "plugin-file",
@@ -405,6 +406,7 @@ describe("legacy file install scan compatibility", () => {
             },
           ],
         },
+        warningFingerprint: "warning-b",
       },
     });
     expect(result?.blocked?.reason).toContain("Reason: review the new finding");
@@ -453,6 +455,7 @@ describe("legacy file install scan compatibility", () => {
     );
     expect(result?.blocked?.reason).not.toContain("initial-rule");
     expect(result?.blocked?.reason).not.toContain("initial evidence");
+    expect(result?.blocked?.installPolicyWarning?.warningFingerprint).toBe("full-warning-b");
     expect(onInstallPolicyWarning).toHaveBeenCalledTimes(1);
     expect(runInstallPolicyMock).toHaveBeenCalledTimes(2);
   });
@@ -502,6 +505,7 @@ describe("legacy file install scan compatibility", () => {
           requestMode: "install",
           reason: "review this plugin",
         },
+        warningFingerprint: "warning-a",
       },
       reason: expectedInstallPolicyNotice({
         decision: "warn",
@@ -577,6 +581,7 @@ describe("legacy file install scan compatibility", () => {
         requestMode: "install",
         reason: "review the dependency warning",
       },
+      warningFingerprint: "warning-a",
     });
     expect(runInstallPolicyMock).toHaveBeenCalledTimes(1);
   });
@@ -608,6 +613,7 @@ describe("legacy file install scan compatibility", () => {
         reason: "review this plugin",
         findings: [{ ruleId: "context", severity: "info", message: "Informational context." }],
       },
+      warningFingerprint: "warning-a",
     });
     expect(warnings).toEqual([
       `${expectedInstallPolicyNotice({

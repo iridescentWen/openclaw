@@ -21,6 +21,7 @@ type InstallPolicyWarningScanIdentity = {
 export type InstallPolicyWarningOccurrence = {
   scan: InstallPolicyWarningScanIdentity;
   warning: InstallPolicyWarningDetails;
+  warningFingerprint: string;
 };
 
 export type InstallPolicyWarningAcknowledgementRequest = InstallPolicyWarningOccurrence & {
