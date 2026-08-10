@@ -392,7 +392,10 @@ function renderRowMessage(
         ? details.reason
         : t("pluginsPage.policyReviewBodyKnown", { count: String(findings.length) });
     return html`
-      <div class="plugins-row-message plugins-row-message--warning" role="alert">
+      <div
+        class="plugins-row-message plugins-row-message--warning plugins-policy-review"
+        role="alert"
+      >
         <div class="plugins-policy-review__header">
           <span class="plugins-policy-review__icon" aria-hidden="true">
             ${icons.alertTriangle}
@@ -501,7 +504,7 @@ function renderRowMessage(
 function fromInteractiveChild(event: Event): boolean {
   return Boolean(
     (event.target as HTMLElement | null)?.closest(
-      "button, a, input, label, form, summary, [role='menu']",
+      "button, a, input, label, form, summary, .plugins-policy-review, [role='menu']",
     ),
   );
 }

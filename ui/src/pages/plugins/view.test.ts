@@ -734,6 +734,8 @@ describe("renderPlugins", () => {
     technicalDetails.querySelector("summary")?.click();
     expect(technicalDetails.open).toBe(true);
     expect(onShowDetails).not.toHaveBeenCalled();
+    technicalDetails.querySelector<HTMLElement>(".plugins-policy-review__details-body")?.click();
+    expect(onShowDetails).not.toHaveBeenCalled();
 
     actionButton(alert, "Cancel")?.click();
     expect(onDismissMessage).toHaveBeenCalledWith(key);
