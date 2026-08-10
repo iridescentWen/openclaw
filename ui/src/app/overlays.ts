@@ -3,7 +3,7 @@ import {
   type GatewayUpdateAvailableEventPayload,
 } from "../../../src/gateway/events.js";
 import type { GatewayEventFrame } from "../api/gateway.ts";
-import type { UpdateAvailable, UpdateHoldResult, UpdateScheduleState } from "../api/types.ts";
+import type { UpdateHoldResult, UpdateScheduleState } from "../api/types.ts";
 import { controlUiVersionDiffersFrom, reloadControlUiIfStale } from "../build-info.ts";
 import { t } from "../i18n/index.ts";
 import {
@@ -13,13 +13,12 @@ import {
   readDevicePairSetupSnapshot,
   refreshDevicePairSetup as refreshDevicePairSetupState,
   setDevicePairSetupAccess as setPairAccess,
-  type DevicePairSetup,
-  type DevicePairSetupAccess,
 } from "../lib/device-pair-setup.ts";
 import {
   createDeviceAuthMigrationLoader,
   EMPTY_DEVICE_AUTH_MIGRATION,
 } from "./device-auth-migration-loader.ts";
+import { ScopeUpgradeController } from "./device-scope-upgrade.ts";
 import {
   clearExecApprovalTimers,
   clearResolvedExecApprovalPrompt,
@@ -28,9 +27,7 @@ import {
   parseApprovalRequestedEvent,
   parseExecApprovalResolved,
   resolveApprovalRequest,
-  type ExecApprovalDecision,
   type ExecApprovalPromptState,
-  type ExecApprovalRequest,
 } from "./exec-approval.ts";
 import type { ApplicationGateway } from "./gateway.ts";
 import { readGatewayOperatorAccess } from "./operator-access.ts";
@@ -39,6 +36,7 @@ import {
   createOverlayPairingPendingCount,
   readOverlayOperatorAccessTransition,
 } from "./overlays-access.ts";
+import type { ApplicationOverlays, ApplicationOverlaySnapshot } from "./overlays-types.ts";
 import {
   createPendingUpdateReconciliation,
   createUpdateCampaignStatusPoller,
@@ -58,42 +56,6 @@ import {
   type UpdateRestartStatusResponse,
   type UpdateRunResponse,
 } from "./update-overlay-helpers.ts";
-
-type ApplicationOverlaySnapshot = {
-  updateAvailable: UpdateAvailable | null;
-  updateSchedule: UpdateScheduleState | null;
-  heldUpdateCampaignId: string | null;
-  updateRunning: boolean;
-  updateReconciliationPending: boolean;
-  updateStatusBanner: ApplicationStatusBanner | null;
-  controlUiRefreshRequired: boolean;
-  approvalQueue: readonly ExecApprovalRequest[];
-  approvalBusy: boolean;
-  approvalErrors: ReadonlyMap<string, string>;
-  approvalNowMs: number;
-  devicePairSetupOpen: boolean;
-  devicePairSetupLoading: boolean;
-  devicePairSetupError: string | null;
-  devicePairSetup: DevicePairSetup | null;
-  devicePairSetupAccess: DevicePairSetupAccess;
-  devicePairPendingCount: number;
-  deviceAuthMigration: import("./device-auth-migration.ts").DeviceAuthMigrationSnapshot;
-};
-
-export type ApplicationOverlays = {
-  readonly snapshot: ApplicationOverlaySnapshot;
-  subscribe: (listener: (snapshot: ApplicationOverlaySnapshot) => void) => () => void;
-  refreshUpdateStatus: () => Promise<void>;
-  runUpdate: () => Promise<void>;
-  holdUpdate: () => Promise<boolean>;
-  decideApproval: (decision: ExecApprovalDecision, approvalId?: string) => Promise<void>;
-  openDevicePairSetup: () => Promise<void>;
-  refreshDevicePairSetup: () => Promise<void>;
-  setDevicePairSetupAccess: (access: DevicePairSetupAccess) => Promise<void>;
-  closeDevicePairSetup: () => void;
-  secureThisBrowser: () => Promise<void>;
-  dispose: () => void;
-};
 
 function isGatewayEvent(value: unknown): value is GatewayEventFrame {
   return Boolean(value && typeof value === "object" && "event" in value);
@@ -126,6 +88,7 @@ export function createApplicationOverlays(
     devicePairSetupAccess: "full",
     devicePairPendingCount: 0,
     deviceAuthMigration: EMPTY_DEVICE_AUTH_MIGRATION,
+    scopeUpgrade: { phase: "hidden" },
   };
   const listeners = new Set<(next: ApplicationOverlaySnapshot) => void>();
   let disposed = false;
@@ -146,6 +109,7 @@ export function createApplicationOverlays(
     grantGeneration: number;
     id: string;
   } | null = null;
+  let scopeUpgrade: ScopeUpgradeController | null = null;
   const devicePairSetupState = createDevicePairSetupState({
     client: gateway.snapshot.client,
     connected: gateway.snapshot.phase === "connected",
@@ -169,6 +133,7 @@ export function createApplicationOverlays(
       approvalBusy: promptState.execApprovalBusy,
       approvalErrors: new Map(promptState.execApprovalErrors),
       approvalNowMs: promptState.execApprovalNowMs ?? Date.now(),
+      scopeUpgrade: scopeUpgrade?.state ?? snapshot.scopeUpgrade,
       ...readDevicePairSetupSnapshot(devicePairSetupState),
     };
     for (const listener of listeners) {
@@ -176,6 +141,7 @@ export function createApplicationOverlays(
     }
   };
   promptState.execApprovalChanged = publish;
+  scopeUpgrade = new ScopeUpgradeController(gateway.snapshot, publish);
   const pairingPendingCount = createOverlayPairingPendingCount({
     gateway,
     state: devicePairSetupState,
@@ -265,6 +231,7 @@ export function createApplicationOverlays(
   });
 
   const synchronizeGateway = (next: ApplicationGateway["snapshot"]) => {
+    scopeUpgrade?.sync(next);
     const previousClient = activeClient;
     const helloChanged = activeHello !== next.hello;
     const connected = next.phase === "connected";
@@ -706,12 +673,22 @@ export function createApplicationOverlays(
       const epoch = connectedEpoch;
       await deviceAuthMigration.secure(client, epoch);
     },
+    requestScopeUpgrade() {
+      scopeUpgrade?.request();
+    },
+    retryScopeUpgrade() {
+      scopeUpgrade?.retry();
+    },
+    cancelScopeUpgrade() {
+      scopeUpgrade?.cancel();
+    },
     dispose() {
       disposed = true;
       approvalDecision = null;
       updateRunGeneration += 1;
       pairingPendingCount.invalidate();
       deviceAuthMigration.dispose();
+      scopeUpgrade?.dispose();
       updateVerification.cancel();
       updateCampaignPoller.stop();
       closeDevicePairSetupState(devicePairSetupState);
