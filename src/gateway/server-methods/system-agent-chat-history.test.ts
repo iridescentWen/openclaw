@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { appendTranscriptTurn } from "../../system-agent/transcript-store.js";
 import { createDeferred } from "../../../test/helpers/promise.js";
+import { appendTranscriptTurn } from "../../system-agent/transcript-store.js";
 import {
   captureSystemAgentWizardAction,
   persistSystemAgentEngineHistory,
