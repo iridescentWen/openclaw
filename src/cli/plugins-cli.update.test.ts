@@ -263,9 +263,11 @@ describe("plugins cli update", () => {
     const helpText = updateCommand?.helpInformation() ?? "";
 
     expect(helpText).toContain("--dangerously-force-unsafe-install");
+    expect(helpText).toContain("--acknowledge-install-policy-warning");
+    expect(helpText).toContain("Deprecated no-op");
     expect(helpText).toContain("Acknowledge");
     expect(helpText).toContain("security.installPolicy");
-    expect(helpText).toMatch(/blocks and failures remain\s+terminal/u);
+    expect(helpText).toMatch(/blocks and\s+failures remain terminal/u);
   });
 
   it("refuses plugin updates in Nix mode before package-manager work", async () => {
@@ -1425,6 +1427,27 @@ describe("plugins cli update", () => {
     updateNpmInstalledPlugins.mockResolvedValue({ config, changed: false, outcomes: [] });
 
     await runPluginsCommand(["plugins", "update", "openclaw-codex-app-server"]);
+
+    const updateParams = expectSingleCallParams(updateNpmInstalledPlugins);
+    expect(updateParams.onInstallPolicyWarning).toEqual(expect.any(Function));
+  });
+
+  it("passes noninteractive install-policy acknowledgement to plugin updates", async () => {
+    setTty(false);
+    const config = createTrackedPluginConfig({
+      pluginId: "openclaw-codex-app-server",
+      spec: "openclaw-codex-app-server",
+    });
+    loadConfig.mockReturnValue(config);
+    setInstalledPluginIndexInstallRecords(config.plugins?.installs ?? {});
+    updateNpmInstalledPlugins.mockResolvedValue({ config, changed: false, outcomes: [] });
+
+    await runPluginsCommand([
+      "plugins",
+      "update",
+      "openclaw-codex-app-server",
+      "--acknowledge-install-policy-warning",
+    ]);
 
     const updateParams = expectSingleCallParams(updateNpmInstalledPlugins);
     expect(updateParams.onInstallPolicyWarning).toEqual(expect.any(Function));

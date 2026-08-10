@@ -84,6 +84,7 @@ async function runPluginInstallCommandUnlocked(
     ...opts,
     config: snapshot.config,
     ...resolveInstallPolicyWarningAcknowledgementCliOptions({
+      acknowledgeInstallPolicyWarning: opts.acknowledgeInstallPolicyWarning,
       dangerouslyForceUnsafeInstall: opts.dangerouslyForceUnsafeInstall,
     }),
   });
@@ -352,7 +353,7 @@ async function runPluginInstallCommandUnlocked(
           }
           return await installFromClawHub(
             leasedSnapshot,
-            resolveInstallSafetyOverrides({ ...opts, config: leasedSnapshot.config }),
+            resolveInstallSafetyOverrides({ ...safetyOverrides, config: leasedSnapshot.config }),
           );
         },
       );

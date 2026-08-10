@@ -175,6 +175,7 @@ type RunPluginUpdateCommandParams = {
   opts: {
     all?: boolean;
     acknowledgeClawHubRisk?: boolean;
+    acknowledgeInstallPolicyWarning?: boolean;
     dryRun?: boolean;
     dangerouslyForceUnsafeInstall?: boolean;
   };
@@ -353,6 +354,7 @@ async function runPluginUpdateCommandUnlocked(params: RunPluginUpdateCommandPara
           syncOfficialPluginInstalls: params.opts.all ? true : undefined,
           coreVersion: VERSION,
           ...resolveInstallPolicyWarningAcknowledgementCliOptions({
+            acknowledgeInstallPolicyWarning: params.opts.acknowledgeInstallPolicyWarning,
             dangerouslyForceUnsafeInstall: params.opts.dangerouslyForceUnsafeInstall,
             allowPrompt: !params.opts.dryRun,
           }),
@@ -383,6 +385,7 @@ async function runPluginUpdateCommandUnlocked(params: RunPluginUpdateCommandPara
       ? await updateNpmInstalledHookPacks({
           config: pluginResult.config,
           ...resolveInstallPolicyWarningAcknowledgementCliOptions({
+            acknowledgeInstallPolicyWarning: params.opts.acknowledgeInstallPolicyWarning,
             dangerouslyForceUnsafeInstall: params.opts.dangerouslyForceUnsafeInstall,
             allowPrompt: !params.opts.dryRun,
           }),

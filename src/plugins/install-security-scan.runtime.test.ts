@@ -393,42 +393,36 @@ describe("legacy file install scan compatibility", () => {
     expect(result?.blocked).toEqual({ code: "security_scan_blocked", reason: "now blocked" });
   });
 
-  it("requires acknowledgement for warn and re-evaluates on the acknowledged attempt", async () => {
+  it("keeps the deprecated unsafe flag inert when policy warns", async () => {
     runInstallPolicyMock.mockResolvedValue({
       warning: { reason: "review this plugin" },
     });
 
-    const firstAttempt = await scanFileInstallSourceRuntime({
-      filePath: "/tmp/payload.js",
-      logger: {},
-      pluginId: "payload",
-    });
-    const acknowledgedAttempt = await scanFileInstallSourceRuntime({
+    const result = await scanFileInstallSourceRuntime({
       dangerouslyForceUnsafeInstall: true,
       filePath: "/tmp/payload.js",
       logger: {},
       pluginId: "payload",
     });
 
-    expect(firstAttempt?.blocked).toEqual({
+    expect(result?.blocked).toEqual({
       code: "security_scan_blocked",
       reason: expectedInstallPolicyNotice({
         decision: "warn",
         guidance: [
           "To continue:",
           "  • Rerun interactively and approve the warning.",
-          "  • For reviewed automation, add --dangerously-force-unsafe-install.",
+          "  • For reviewed automation, add --acknowledge-install-policy-warning.",
         ],
         reason: "review this plugin",
         targetName: "payload",
         targetType: "plugin",
       }),
     });
-    expect(acknowledgedAttempt).toBeUndefined();
-    expect(runInstallPolicyMock).toHaveBeenCalledTimes(3);
+    expect(runInstallPolicyMock).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps a block from forced policy re-evaluation terminal", async () => {
+  it("keeps a block from acknowledged policy re-evaluation terminal", async () => {
     runInstallPolicyMock
       .mockResolvedValueOnce({ warning: { reason: "review this plugin" } })
       .mockResolvedValueOnce({
@@ -436,9 +430,9 @@ describe("legacy file install scan compatibility", () => {
       });
 
     const result = await scanFileInstallSourceRuntime({
-      dangerouslyForceUnsafeInstall: true,
       filePath: "/tmp/payload.js",
       logger: {},
+      onInstallPolicyWarning: vi.fn().mockResolvedValue(true),
       pluginId: "payload",
     });
 

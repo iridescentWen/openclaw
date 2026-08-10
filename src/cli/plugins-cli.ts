@@ -10,6 +10,7 @@ import { applyParentDefaultHelpAction } from "./program/parent-default-help.js";
 type PluginUpdateOptions = {
   all?: boolean;
   acknowledgeClawhubRisk?: boolean;
+  acknowledgeInstallPolicyWarning?: boolean;
   dryRun?: boolean;
   dangerouslyForceUnsafeInstall?: boolean;
 };
@@ -186,7 +187,12 @@ export function registerPluginsCli(program: Command) {
     .option("--pin", "Record npm installs as exact resolved <name>@<version>", false)
     .option(
       "--dangerously-force-unsafe-install",
-      "Acknowledge security.installPolicy warnings; blocks and failures remain terminal",
+      "Deprecated no-op; security.installPolicy may still block",
+      false,
+    )
+    .option(
+      "--acknowledge-install-policy-warning",
+      "Acknowledge security.installPolicy warnings without prompting; blocks and failures remain terminal",
       false,
     )
     .option(
@@ -202,6 +208,7 @@ export function registerPluginsCli(program: Command) {
       async (
         raw: string,
         opts: CommanderClawHubRiskOptions & {
+          acknowledgeInstallPolicyWarning?: boolean;
           dangerouslyForceUnsafeInstall?: boolean;
           force?: boolean;
           link?: boolean;
@@ -225,7 +232,12 @@ export function registerPluginsCli(program: Command) {
     .option("--dry-run", "Show what would change without writing", false)
     .option(
       "--dangerously-force-unsafe-install",
-      "Acknowledge security.installPolicy warnings; blocks and failures remain terminal",
+      "Deprecated no-op; security.installPolicy may still block",
+      false,
+    )
+    .option(
+      "--acknowledge-install-policy-warning",
+      "Acknowledge security.installPolicy warnings without prompting; blocks and failures remain terminal",
       false,
     )
     .option(

@@ -641,7 +641,12 @@ export function registerSkillsCli(program: Command) {
     )
     .option(
       "--dangerously-force-unsafe-install",
-      "Acknowledge security.installPolicy warnings; blocks and failures remain terminal",
+      "Deprecated no-op; security.installPolicy may still block",
+      false,
+    )
+    .option(
+      "--acknowledge-install-policy-warning",
+      "Acknowledge security.installPolicy warnings without prompting; blocks and failures remain terminal",
       false,
     )
     .option("--global", "Install into the shared managed skills directory", false)
@@ -660,6 +665,7 @@ export function registerSkillsCli(program: Command) {
           forceInstall?: boolean;
           acknowledgeClawhubRisk?: boolean;
           acknowledgeClawHubRisk?: boolean;
+          acknowledgeInstallPolicyWarning?: boolean;
           dangerouslyForceUnsafeInstall?: boolean;
           global?: boolean;
           agent?: string;
@@ -691,6 +697,7 @@ export function registerSkillsCli(program: Command) {
               force: Boolean(opts.force),
               config,
               ...resolveInstallPolicyWarningAcknowledgementCliOptions({
+                acknowledgeInstallPolicyWarning: opts.acknowledgeInstallPolicyWarning,
                 dangerouslyForceUnsafeInstall: opts.dangerouslyForceUnsafeInstall,
               }),
               logger: {
@@ -727,6 +734,7 @@ export function registerSkillsCli(program: Command) {
             force: Boolean(opts.force),
             config,
             ...resolveInstallPolicyWarningAcknowledgementCliOptions({
+              acknowledgeInstallPolicyWarning: opts.acknowledgeInstallPolicyWarning,
               dangerouslyForceUnsafeInstall: opts.dangerouslyForceUnsafeInstall,
             }),
             ...(opts.forceInstall ? { forceInstall: true } : {}),
@@ -771,7 +779,12 @@ export function registerSkillsCli(program: Command) {
     )
     .option(
       "--dangerously-force-unsafe-install",
-      "Acknowledge security.installPolicy warnings; blocks and failures remain terminal",
+      "Deprecated no-op; security.installPolicy may still block",
+      false,
+    )
+    .option(
+      "--acknowledge-install-policy-warning",
+      "Acknowledge security.installPolicy warnings without prompting; blocks and failures remain terminal",
       false,
     )
     .option("--global", "Update skills in the shared managed skills directory", false)
@@ -784,6 +797,7 @@ export function registerSkillsCli(program: Command) {
           forceInstall?: boolean;
           acknowledgeClawhubRisk?: boolean;
           acknowledgeClawHubRisk?: boolean;
+          acknowledgeInstallPolicyWarning?: boolean;
           dangerouslyForceUnsafeInstall?: boolean;
           global?: boolean;
           agent?: string;
@@ -815,6 +829,7 @@ export function registerSkillsCli(program: Command) {
             slug,
             ...(opts.forceInstall ? { forceInstall: true } : {}),
             ...resolveInstallPolicyWarningAcknowledgementCliOptions({
+              acknowledgeInstallPolicyWarning: opts.acknowledgeInstallPolicyWarning,
               dangerouslyForceUnsafeInstall: opts.dangerouslyForceUnsafeInstall,
             }),
             ...resolveSkillClawHubRiskOptions(

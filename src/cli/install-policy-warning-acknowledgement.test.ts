@@ -70,15 +70,34 @@ describe("resolveInstallPolicyWarningAcknowledgementCliOptions", () => {
     ).resolves.toBe(false);
   });
 
-  it("does not prompt outside a TTY or when the force flag is present", () => {
+  it("does not prompt outside a TTY", () => {
     setTty(false);
     expect(resolveInstallPolicyWarningAcknowledgementCliOptions({})).toEqual({});
+  });
 
+  it("keeps the deprecated unsafe flag inert without suppressing an interactive prompt", () => {
     setTty(true);
-    expect(
-      resolveInstallPolicyWarningAcknowledgementCliOptions({
-        dangerouslyForceUnsafeInstall: true,
+    const options = resolveInstallPolicyWarningAcknowledgementCliOptions({
+      dangerouslyForceUnsafeInstall: true,
+    });
+
+    expect(options.dangerouslyForceUnsafeInstall).toBe(true);
+    expect(options.onInstallPolicyWarning).toBeTypeOf("function");
+  });
+
+  it("uses the dedicated acknowledgement flag without prompting", async () => {
+    setTty(false);
+    const options = resolveInstallPolicyWarningAcknowledgementCliOptions({
+      acknowledgeInstallPolicyWarning: true,
+    });
+
+    await expect(
+      options.onInstallPolicyWarning?.({
+        targetName: "demo",
+        targetType: "plugin",
+        requestMode: "install",
       }),
-    ).toEqual({ dangerouslyForceUnsafeInstall: true });
+    ).resolves.toBe(true);
+    expect(promptTextMock).not.toHaveBeenCalled();
   });
 });

@@ -136,7 +136,7 @@ openclaw plugins install <plugin> --marketplace <name>      # marketplace (expli
 openclaw plugins install <package> --force                  # confirm source / overwrite existing
 openclaw plugins install <package> --pin                    # pin resolved npm version
 openclaw plugins install clawhub:<package> --acknowledge-clawhub-risk
-openclaw plugins install <package> --dangerously-force-unsafe-install
+openclaw plugins install <package> --acknowledge-install-policy-warning
 ```
 
 Maintainers testing setup-time installs can override automatic plugin install
@@ -197,10 +197,10 @@ non-npm sources are not rewritten.
   <Accordion title="--pin scope">
     `--pin` applies to npm installs only and records the resolved exact `<name>@<version>`. It is not supported with `git:` installs (pin the ref in the spec instead, e.g. `git:github.com/acme/plugin@v1.2.3`) or with `--marketplace` (marketplace installs persist marketplace source metadata instead of an npm spec).
   </Accordion>
-  <Accordion title="--dangerously-force-unsafe-install">
-    When `security.installPolicy` returns `warn` in an interactive terminal, OpenClaw prints the reason and findings, then uses the same acknowledgement copy as a suspicious ClawHub release: `type: '<plugin>' to install anyway`. A matching answer re-evaluates the staged source before continuing. A declined or non-interactive install stops before commit; after review, `--dangerously-force-unsafe-install` is the explicit noninteractive approval. Every approved warning is re-evaluated before continuing. Neither form overrides `block` or a policy failure.
+  <Accordion title="--acknowledge-install-policy-warning">
+    When `security.installPolicy` returns `warn` in an interactive terminal, OpenClaw prints the reason and findings, then uses the same acknowledgement copy as a suspicious ClawHub release: `type: '<plugin>' to install anyway`. A matching answer re-evaluates the staged source before continuing. A declined or non-interactive install stops before commit; after review, `--acknowledge-install-policy-warning` is the explicit noninteractive approval. Every approved warning is re-evaluated before continuing. Neither form overrides `block` or a policy failure.
 
-    If a plugin you published on ClawHub is hidden or blocked by a registry scan, use the publisher steps in [ClawHub publishing](/clawhub/publishing). `--dangerously-force-unsafe-install` does not ask ClawHub to rescan the plugin or make a blocked release public.
+    If a plugin you published on ClawHub is hidden or blocked by a registry scan, use the publisher steps in [ClawHub publishing](/clawhub/publishing). This flag does not ask ClawHub to rescan the plugin or make a blocked release public. The deprecated `--dangerously-force-unsafe-install` flag remains a no-op.
 
   </Accordion>
   <Accordion title="--acknowledge-clawhub-risk">
@@ -436,7 +436,7 @@ openclaw plugins update <id-or-npm-spec> --dry-run
 openclaw plugins update @openclaw/voice-call
 openclaw plugins update @acme/demo
 openclaw plugins update openclaw-codex-app-server --acknowledge-clawhub-risk
-openclaw plugins update openclaw-codex-app-server --dangerously-force-unsafe-install
+openclaw plugins update openclaw-codex-app-server --acknowledge-install-policy-warning
 ```
 
 Updates apply to tracked plugin installs in the managed plugin index and tracked hook-pack installs in shared SQLite state. They reuse the source that the user already chose when installing the plugin, so they do not require a second source acknowledgement.
@@ -468,7 +468,7 @@ Updates apply to tracked plugin installs in the managed plugin index and tracked
     When a stored integrity hash exists and the fetched artifact hash changes, OpenClaw treats that as npm artifact drift. The interactive `openclaw plugins update` command prints the expected and actual hashes and asks for confirmation before proceeding. Non-interactive update helpers fail closed unless the caller supplies an explicit continuation policy.
 
   </Accordion>
-  <Accordion title="--dangerously-force-unsafe-install on update">
+  <Accordion title="--acknowledge-install-policy-warning on update">
     `plugins update` uses the same warning acknowledgement as install, with `type: '<plugin>' to update anyway` in an interactive terminal. The policy is re-evaluated, and `block` or a policy failure remains terminal.
   </Accordion>
   <Accordion title="--acknowledge-clawhub-risk on update">

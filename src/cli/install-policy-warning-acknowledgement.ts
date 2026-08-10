@@ -10,25 +10,28 @@ function canPromptForInstallPolicyWarning(): boolean {
 }
 
 export function resolveInstallPolicyWarningAcknowledgementCliOptions(params: {
+  acknowledgeInstallPolicyWarning?: boolean;
   dangerouslyForceUnsafeInstall?: boolean;
   allowPrompt?: boolean;
 }): Pick<InstallSafetyOverrides, "dangerouslyForceUnsafeInstall" | "onInstallPolicyWarning"> {
   const canPrompt =
-    !params.dangerouslyForceUnsafeInstall &&
+    !params.acknowledgeInstallPolicyWarning &&
     params.allowPrompt !== false &&
     canPromptForInstallPolicyWarning();
   return {
     ...(params.dangerouslyForceUnsafeInstall ? { dangerouslyForceUnsafeInstall: true } : {}),
-    ...(canPrompt
-      ? {
-          onInstallPolicyWarning: async (request: InstallPolicyWarningAcknowledgementRequest) => {
-            const targetName = sanitizeTerminalText(request.targetName);
-            const answer = await promptText(
-              `type: '${targetName}' to ${request.requestMode} anyway\n> `,
-            );
-            return answer.trim() === targetName;
-          },
-        }
-      : {}),
+    ...(params.acknowledgeInstallPolicyWarning
+      ? { onInstallPolicyWarning: async () => true }
+      : canPrompt
+        ? {
+            onInstallPolicyWarning: async (request: InstallPolicyWarningAcknowledgementRequest) => {
+              const targetName = sanitizeTerminalText(request.targetName);
+              const answer = await promptText(
+                `type: '${targetName}' to ${request.requestMode} anyway\n> `,
+              );
+              return answer.trim() === targetName;
+            },
+          }
+        : {}),
   };
 }

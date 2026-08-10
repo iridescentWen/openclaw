@@ -340,7 +340,7 @@ Plugins run in-process with the Gateway - treat them as trusted code.
   - npm and git plugin installs run package-manager dependency convergence only during the explicit install/update flow. Local paths and archives are treated as self-contained packages; OpenClaw copies/references them without running `npm install`.
   - Prefer pinned exact versions (`@scope/pkg@1.2.3`) and inspect the unpacked code before enabling.
   - `security.installPolicy` lets operators run a trusted local command to return `allow`, `warn`, or `block` for skill and plugin installs. It runs after source material is staged but before install continues and applies to ClawHub skills too.
-  - A `warn` result stops before commit. Interactive CLI commands ask the operator to type the plugin or skill name using the same wording as suspicious ClawHub releases, then re-evaluate policy before continuing. Declined and non-interactive commands can use `--dangerously-force-unsafe-install` as explicit approval after review; every approved warning is re-evaluated before continuing. `block` and policy failures remain terminal.
+  - A `warn` result stops before commit. Interactive CLI commands ask the operator to type the plugin or skill name using the same wording as suspicious ClawHub releases, then re-evaluate policy before continuing. Declined and non-interactive commands can use `--acknowledge-install-policy-warning` as explicit approval after review; every approved warning is re-evaluated before continuing. `block` and policy failures remain terminal. The deprecated `--dangerously-force-unsafe-install` flag remains a no-op.
 
 Details: [Plugins](/tools/plugin)
 

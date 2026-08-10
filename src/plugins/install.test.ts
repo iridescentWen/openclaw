@@ -2253,7 +2253,7 @@ describe("installPluginFromNpmSpec", () => {
     });
   });
 
-  it("emits archive source family after installing a local npm-pack archive", async () => {
+  it("preserves archive source family and policy acknowledgement for npm-pack installs", async () => {
     const root = suiteTempRootTracker.makeTempDir();
     const npmDir = path.join(root, "npm");
     const extensionsDir = path.join(root, "extensions");
@@ -2284,7 +2284,10 @@ describe("installPluginFromNpmSpec", () => {
       ]),
     });
     mockSuccessfulManagedNpmInstall({ packageName, version: "1.2.3" });
+    const onInstallPolicyWarning = vi.fn().mockResolvedValue(true);
+    const scanSpy = vi.spyOn(installSecurityScan, "scanPackageInstallSource");
     const captured = captureSecurityEvents();
+    let policyAcknowledgementForwarded = false;
 
     let result: Awaited<ReturnType<typeof installPluginFromNpmPackArchive>>;
     try {
@@ -2292,12 +2295,18 @@ describe("installPluginFromNpmSpec", () => {
         archivePath,
         extensionsDir,
         npmDir,
+        onInstallPolicyWarning,
       });
+      policyAcknowledgementForwarded = scanSpy.mock.calls.some(
+        ([params]) => params.onInstallPolicyWarning === onInstallPolicyWarning,
+      );
     } finally {
       captured.stop();
+      scanSpy.mockRestore();
     }
 
     expect(result!.ok).toBe(true);
+    expect(policyAcknowledgementForwarded).toBe(true);
     expect(captured.events).toHaveLength(1);
     expect(captured.events[0]).toMatchObject({
       category: "plugin",

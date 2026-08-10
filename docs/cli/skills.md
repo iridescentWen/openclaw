@@ -35,13 +35,13 @@ openclaw skills install ./path/to/skill --as custom-name
 openclaw skills install @owner/<slug> --force
 openclaw skills install @owner/<slug> --force-install
 openclaw skills install @owner/<slug> --acknowledge-clawhub-risk
-openclaw skills install @owner/<slug> --dangerously-force-unsafe-install
+openclaw skills install @owner/<slug> --acknowledge-install-policy-warning
 openclaw skills install @owner/<slug> --agent <id>
 openclaw skills install @owner/<slug> --global
 openclaw skills update @owner/<slug>
 openclaw skills update @owner/<slug> --force-install
 openclaw skills update @owner/<slug> --acknowledge-clawhub-risk
-openclaw skills update @owner/<slug> --dangerously-force-unsafe-install
+openclaw skills update @owner/<slug> --acknowledge-install-policy-warning
 openclaw skills update @owner/<slug> --global
 openclaw skills update --all
 openclaw skills update --all --agent <id>
@@ -104,9 +104,10 @@ When `security.installPolicy` returns `warn` in an interactive terminal,
 OpenClaw prints the reason and findings, then asks `type: '<skill>' to install
 anyway` (or `update anyway`). A matching answer evaluates the staged skill
 again before continuing. Declined and non-interactive commands stop before
-commit; after review, `--dangerously-force-unsafe-install` is the explicit
+commit; after review, `--acknowledge-install-policy-warning` is the explicit
 noninteractive approval, and every approved warning is re-evaluated before
-continuing. `block` and policy failures remain terminal.
+continuing. `block` and policy failures remain terminal. The deprecated
+`--dangerously-force-unsafe-install` flag remains a no-op.
 
 Notes:
 

@@ -688,6 +688,27 @@ describe("skills cli commands", () => {
     );
   });
 
+  it("passes noninteractive install-policy acknowledgement to skill installs", async () => {
+    setTty(false);
+    installSkillFromSourceMock.mockResolvedValue({
+      ok: true,
+      slug: "tools",
+      targetDir: "/tmp/workspace/skills/tools",
+      source: "git",
+    });
+
+    await runCommand([
+      "skills",
+      "install",
+      "git:owner/tools",
+      "--acknowledge-install-policy-warning",
+    ]);
+
+    expect(mockFirstObjectArg(installSkillFromSourceMock).onInstallPolicyWarning).toEqual(
+      expect.any(Function),
+    );
+  });
+
   it("installs a skill from a local directory", async () => {
     installSkillFromSourceMock.mockResolvedValue({
       ok: true,

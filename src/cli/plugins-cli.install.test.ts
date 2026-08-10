@@ -639,8 +639,8 @@ describe("plugins cli install", () => {
     const helpText = installCommand?.helpInformation() ?? "";
 
     expect(helpText.match(/--force/g)).toHaveLength(1);
-    expect(helpText).toContain("Confirm non-ClawHub sources and overwrite");
-    expect(helpText).toContain("an existing plugin or hook pack");
+    expect(helpText).toMatch(/Confirm non-ClawHub sources and\s+overwrite/u);
+    expect(helpText).toMatch(/an existing plugin or hook\s+pack/u);
   });
 
   it("refuses plugin installs in Nix mode before installer side effects", async () => {
@@ -1626,6 +1626,20 @@ describe("plugins cli install", () => {
       version: "1.2.3",
     });
     expect(installPluginFromNpmSpec).not.toHaveBeenCalled();
+  });
+
+  it("preserves noninteractive policy acknowledgement across the ClawHub lifecycle lease", async () => {
+    setTty(false);
+    primeSuccessfulClawHubPluginInstall();
+
+    await runPluginsCommand([
+      "plugins",
+      "install",
+      "clawhub:demo",
+      "--acknowledge-install-policy-warning",
+    ]);
+
+    expect(clawHubInstallCall().onInstallPolicyWarning).toEqual(expect.any(Function));
   });
 
   it("does not report a ClawHub install when durable persistence fails", async () => {
