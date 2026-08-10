@@ -919,6 +919,10 @@ describe("SystemAgentChatEngine", () => {
       name: "chat command",
       cancel: (engine: SystemAgentChatEngine) => engine.handle("cancel"),
     },
+    {
+      name: "typed direct action",
+      cancel: (engine: SystemAgentChatEngine, stepId: string) => engine.cancelWizard({ stepId }),
+    },
   ])("cancels active QR setup through a $name", async ({ cancel }) => {
     let cleanupStarted = false;
     let releaseCleanup!: () => void;

@@ -968,6 +968,9 @@ export class SystemAgentChatEngine {
     if (!bridge.session.cancel()) {
       throw new SystemAgentWizardAnswerError("The hosted wizard cannot be cancelled right now.");
     }
+    // Cancellation releases the prompt before dependency-owned cleanup finishes.
+    // Do not publish terminal state while the runner can still mutate setup state.
+    await bridge.session.whenSettled();
     const text = await this.pumpWizardBridge();
     return this.completeTurn({ text, action: "none" }, "Cancel");
   }
