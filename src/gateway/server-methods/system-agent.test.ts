@@ -729,11 +729,19 @@ describe("openclaw.chat", () => {
     expect(transcriptStoreMocks.appendTranscriptTurn).toHaveBeenCalledTimes(2);
     expect(transcriptStoreMocks.appendTranscriptTurn).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ role: "user", text: "How is this machine doing?" }),
+      expect.objectContaining({
+        role: "user",
+        text: "How is this machine doing?",
+        sessionId: "s1",
+      }),
     );
     expect(transcriptStoreMocks.appendTranscriptTurn).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ role: "assistant", text: "Everything is healthy." }),
+      expect.objectContaining({
+        role: "assistant",
+        text: "Everything is healthy.",
+        sessionId: "s1",
+      }),
     );
     expect(JSON.stringify(transcriptStoreMocks.appendTranscriptTurn.mock.calls)).not.toContain(
       "ui-context",

@@ -9,8 +9,10 @@ type SystemAgentTranscriptEntry = {
   sessionId?: string;
 };
 
-type SystemAgentTranscriptTurn = Omit<SystemAgentTranscriptEntry, "role"> & {
+type SystemAgentTranscriptTurn = {
   role: "user" | "assistant";
+  text: string;
+  at: number;
 };
 
 const SYSTEM_AGENT_TRANSCRIPT_SCOPE = "system-agent-transcript";
@@ -59,8 +61,9 @@ export function readTranscriptTail(
   const window = opts.afterLastReset ? entries.slice(resetIndex + 1) : entries;
   return window
     .filter(
-      (turn): turn is SystemAgentTranscriptTurn =>
+      (turn): turn is SystemAgentTranscriptEntry & { role: "user" | "assistant" } =>
         turn.role !== "reset" && (!opts.sessionId || turn.sessionId === opts.sessionId),
     )
-    .slice(-limit);
+    .slice(-limit)
+    .map(({ role, text, at }) => ({ role, text, at }));
 }

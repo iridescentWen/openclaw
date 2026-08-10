@@ -49,13 +49,11 @@ describe("system-agent transcript store", () => {
           role: "user",
           text: "session one question",
           at: 1,
-          sessionId: "session-one",
         },
         {
           role: "assistant",
           text: "session one answer",
           at: 3,
-          sessionId: "session-one",
         },
       ]);
       expect(readTranscriptTail(0, { env, sessionId: "session-one" })).toEqual([]);

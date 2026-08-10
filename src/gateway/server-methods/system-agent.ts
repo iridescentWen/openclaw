@@ -121,12 +121,16 @@ async function evictOldestSession(
   }
 }
 
-function persistEngineHistory(engine: SystemAgentChatSession["engine"], startIndex: number): void {
+function persistEngineHistory(
+  engine: SystemAgentChatSession["engine"],
+  startIndex: number,
+  sessionId: string,
+): void {
   const at = Date.now();
   for (const turn of engine.historySince(startIndex)) {
     // Engine history is authoritative here: sensitive user text has already
     // been replaced by the mask marker before it crosses this boundary.
-    appendTranscriptTurn({ ...turn, at });
+    appendTranscriptTurn({ ...turn, at, sessionId });
   }
 }
 
@@ -569,7 +573,7 @@ export const systemAgentHandlers: GatewayRequestHandlers = {
             respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, error.message));
             return;
           }
-          persistEngineHistory(engine, welcomeHistoryStart);
+          persistEngineHistory(engine, welcomeHistoryStart, sessionId);
           await evictOldestSession(sessions, context);
           session = {
             engine,
@@ -634,7 +638,7 @@ export const systemAgentHandlers: GatewayRequestHandlers = {
           }
           reply = turnReply;
         } catch (error) {
-          persistEngineHistory(session.engine, historyStart);
+          persistEngineHistory(session.engine, historyStart, sessionId);
           if (error instanceof SystemAgentWizardAnswerError) {
             respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, error.message));
             return;
@@ -663,7 +667,7 @@ export const systemAgentHandlers: GatewayRequestHandlers = {
           );
           return;
         }
-        persistEngineHistory(session.engine, historyStart);
+        persistEngineHistory(session.engine, historyStart, sessionId);
         const delegation = params.delegation;
         let proposalId: string | undefined;
         if (delegation) {

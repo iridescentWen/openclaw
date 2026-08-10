@@ -133,6 +133,91 @@ async function withTranscriptState(prefix: string, run: () => Promise<void>): Pr
 }
 
 describe("openclaw.chat reset boundary", () => {
+  it("persists session attribution through the scoped recovery handler", async () => {
+    await withTranscriptState("openclaw-session-recovery-boundary-", async () => {
+      const fixture = await createSystemAgentVerifiedInferenceTestFixture(verifiedConfig);
+      const engine = new SystemAgentChatEngine({
+        surface: "gateway",
+        verifiedInference: fixture.binding,
+        deps: {
+          ...fixture.deps,
+          readConfigFileSnapshot: async () =>
+            ({
+              exists: true,
+              valid: true,
+              path: "/tmp/openclaw.json",
+              hash: "verified-config",
+              config: verifiedConfig,
+              runtimeConfig: verifiedConfig,
+              sourceConfig: verifiedConfig,
+              issues: [],
+            }) as never,
+        },
+        runChannelSetupWizard: async (_channel, prompter) => {
+          await prompter.text({ message: "Bot token" });
+        },
+      });
+      const sessions = new Map<string, SystemAgentChatSession>([
+        [
+          "recover-session",
+          {
+            engine,
+            welcome: "welcome text",
+            lastUsedAt: 1,
+            ownerKey: "device:device-test",
+          },
+        ],
+      ]);
+      const context = { systemAgentSessions: sessions } as unknown as GatewayRequestContext;
+      const chatResponses: Array<{ ok: boolean; payload?: unknown; error?: unknown }> = [];
+
+      await expectDefined(
+        systemAgentHandlers["openclaw.chat"],
+        'systemAgentHandlers["openclaw.chat"] test invariant',
+      )({
+        params: { sessionId: "recover-session", message: "connect telegram" },
+        client,
+        context,
+        respond: (ok: boolean, payload?: unknown, error?: unknown) =>
+          chatResponses.push({ ok, payload, error }),
+      } as never);
+
+      expect(chatResponses).toEqual([
+        {
+          ok: true,
+          payload: expect.objectContaining({
+            wizardInputPending: true,
+            step: expect.objectContaining({ message: "Bot token" }),
+          }),
+          error: undefined,
+        },
+      ]);
+      const historyResponses: Array<{ ok: boolean; payload?: unknown; error?: unknown }> = [];
+      await expectDefined(
+        systemAgentHandlers["openclaw.chat.history"],
+        'systemAgentHandlers["openclaw.chat.history"] test invariant',
+      )({
+        params: { sessionId: "recover-session" },
+        client,
+        context,
+        respond: (ok: boolean, payload?: unknown, error?: unknown) =>
+          historyResponses.push({ ok, payload, error }),
+      } as never);
+
+      expect(historyResponses[0]).toMatchObject({
+        ok: true,
+        payload: {
+          turns: [
+            { role: "user", text: "connect telegram" },
+            { role: "assistant", text: expect.any(String) },
+          ],
+          activeWizard: expect.objectContaining({ sessionId: "recover-session" }),
+        },
+      });
+      expect(historyResponses[0]).not.toHaveProperty("payload.turns.0.sessionId");
+    });
+  });
+
   // The reset discards the live session before initialization runs, so the
   // durable boundary has to survive a failed replacement. Otherwise the next
   // ordinary session seeds from the pre-reset transcript and undoes the reset.
