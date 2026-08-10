@@ -104,8 +104,9 @@ When `security.installPolicy` returns `warn` in an interactive terminal,
 OpenClaw prints the reason and findings, then asks `type: '<skill>' to install
 anyway` (or `update anyway`). A matching answer evaluates the staged skill
 again before continuing. Declined and non-interactive commands stop before
-commit; after review, rerun with `--dangerously-force-unsafe-install`. `block`
-and policy failures remain terminal.
+commit; after review, `--dangerously-force-unsafe-install` is the explicit
+noninteractive approval, and every approved warning is re-evaluated before
+continuing. `block` and policy failures remain terminal.
 
 Notes:
 

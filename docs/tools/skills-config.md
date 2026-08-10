@@ -181,7 +181,8 @@ write one JSON object on stdout with an `allow`, `warn`, or `block` decision.
 plugin and skill commands ask the operator to type the target name using the
 same `install anyway` or `update anyway` copy as suspicious ClawHub releases,
 then run policy again before continuing. Declined and non-interactive commands
-may be rerun with `--dangerously-force-unsafe-install` after review.
+may use `--dangerously-force-unsafe-install` as explicit approval after review;
+every approved warning is re-evaluated before continuing.
 Gateway-backed and automatic installs remain
 blocked on warnings because they have no operator-confirmation flow. A `block`, non-zero
 exit, timeout, malformed JSON, missing field, or unsupported protocol version

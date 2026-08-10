@@ -393,6 +393,24 @@ describe("legacy file install scan compatibility", () => {
       }),
     });
     expect(acknowledgedAttempt).toBeUndefined();
+    expect(runInstallPolicyMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps a block from forced policy re-evaluation terminal", async () => {
+    runInstallPolicyMock
+      .mockResolvedValueOnce({ warning: { reason: "review this plugin" } })
+      .mockResolvedValueOnce({
+        blocked: { code: "security_scan_blocked", reason: "now blocked" },
+      });
+
+    const result = await scanFileInstallSourceRuntime({
+      dangerouslyForceUnsafeInstall: true,
+      filePath: "/tmp/payload.js",
+      logger: {},
+      pluginId: "payload",
+    });
+
+    expect(result?.blocked).toEqual({ code: "security_scan_blocked", reason: "now blocked" });
     expect(runInstallPolicyMock).toHaveBeenCalledTimes(2);
   });
 
