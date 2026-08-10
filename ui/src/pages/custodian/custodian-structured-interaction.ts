@@ -28,6 +28,7 @@ type StructuredInteractionHost = {
     client: GatewayBrowserClient,
     params: SystemAgentChatParams,
     display: string,
+    appendUserMessage: boolean,
   ) => Promise<eventNudgeState.CustodianSendOutcome>;
 };
 
@@ -68,7 +69,7 @@ export function createCustodianStructuredInteraction(host: StructuredInteraction
       }) ?? [...state.messages],
     );
     host.emit();
-    const outcome = await host.sendUserTurn(params.client, params.request, params.display);
+    const outcome = await host.sendUserTurn(params.client, params.request, params.display, false);
     const current = host.state();
     const response: CustodianStructuredResponse | null =
       outcome === "rejected"
@@ -99,15 +100,24 @@ export function createCustodianStructuredInteraction(host: StructuredInteraction
       if (!state.activeClient) {
         return;
       }
-      const outcome = await submit({
-        client: state.activeClient,
-        message,
-        request: {
+      if (
+        !state.chatAvailable ||
+        state.sending ||
+        state.setupRequired ||
+        !state.messages.includes(message)
+      ) {
+        host.emit();
+        return;
+      }
+      const outcome = await host.sendUserTurn(
+        state.activeClient,
+        {
           sessionId: state.sessionId,
           ...custodianChatParams(state.variant, question.isOther ? t("optionCard.skip") : "cancel"),
         },
-        display: t("optionCard.skip"),
-      });
+        t("optionCard.skip"),
+        true,
+      );
       if (outcome !== "rejected" && host.state().messages.includes(message)) {
         host.markDismissed(message, question.id);
       }
@@ -120,15 +130,24 @@ export function createCustodianStructuredInteraction(host: StructuredInteraction
         return;
       }
       const option = question.options.find((candidate) => candidate.label === label);
-      void submit({
-        client: state.activeClient,
-        message,
-        request: {
+      if (
+        !state.chatAvailable ||
+        state.sending ||
+        state.setupRequired ||
+        !state.messages.includes(message)
+      ) {
+        host.emit();
+        return;
+      }
+      void host.sendUserTurn(
+        state.activeClient,
+        {
           sessionId: state.sessionId,
           ...custodianChatParams(state.variant, option?.reply ?? label),
         },
-        display: label,
-      });
+        label,
+        true,
+      );
     },
 
     answerWizardStep(message: CustodianMessage, value: unknown): void {

@@ -160,6 +160,71 @@ describe("Custodian wizard reload recovery", () => {
     expect(third.page.querySelector(".custodian__wizard-step")).toBeNull();
   });
 
+  it("restores ordinary question answers as user turns instead of wizard receipts", async () => {
+    reconcileCustodianRecoveryForClient(
+      recoveryClient,
+      gatewayUrl,
+      {
+        sessionId: "ordinary-answer-session",
+        reply: "Choose a channel.",
+        action: "none",
+        wizardInputPending: true,
+        step: {
+          id: "channel",
+          type: "select",
+          message: "Which channel?",
+          options: [{ label: "WhatsApp", value: "whatsapp" }],
+        },
+      },
+      "ordinary-answer-session",
+    );
+    const request = vi.fn(async (method: string) => {
+      if (method !== "openclaw.chat.history") {
+        throw new Error(`unexpected method ${method}`);
+      }
+      return {
+        turns: [
+          {
+            role: "assistant",
+            text: "What would you like to do first?",
+            at: 1,
+            sessionId: "ordinary-answer-session",
+          },
+          {
+            role: "user",
+            text: "Connect WhatsApp",
+            at: 2,
+            sessionId: "ordinary-answer-session",
+          },
+          {
+            role: "assistant",
+            text: "Choose a channel.",
+            at: 3,
+            sessionId: "ordinary-answer-session",
+          },
+        ],
+        activeWizard: {
+          sessionId: "ordinary-answer-session",
+          step: {
+            id: "channel",
+            type: "select",
+            message: "Which channel?",
+            options: [{ label: "WhatsApp", value: "whatsapp" }],
+          },
+        },
+      };
+    });
+    const { context } = createContext(request, ["openclaw.chat", "openclaw.chat.history"], {
+      gatewayCapabilities: recoveryCapabilities,
+      recoveryScope,
+    });
+    const { page } = await mountPage(context);
+
+    await waitForFast(() => expect(page.querySelector(".custodian__wizard-step")).not.toBeNull());
+    expect(page.querySelector(".chat-group.user")?.textContent).toContain("Connect WhatsApp");
+    expect(page.querySelector(".custodian__structured-response")).toBeNull();
+  });
+
   it("waits for the authenticated recovery scope before starting a fresh session", async () => {
     reconcileCustodianRecoveryForScope(
       recoveryOwner,

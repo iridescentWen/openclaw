@@ -312,9 +312,7 @@ suite.define(() => {
           message: "cancel",
           sessionId: "e2e-wizard-custodian",
         });
-        await page
-          .locator(".custodian__structured-response", { hasText: "Skip for now" })
-          .waitFor();
+        await page.locator(".chat-group.user", { hasText: "Skip for now" }).waitFor();
         await page.getByText("Moving on.").waitFor();
         expect(await page.locator("openclaw-option-card").count()).toBe(0);
       },

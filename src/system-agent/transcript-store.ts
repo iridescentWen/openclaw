@@ -15,6 +15,8 @@ type SystemAgentTranscriptTurn = {
   role: "user" | "assistant";
   text: string;
   at: number;
+  sessionId?: string;
+  wizardAction?: SystemAgentChatHistoryWizardAction;
 };
 
 const SYSTEM_AGENT_TRANSCRIPT_SCOPE = "system-agent-transcript";
@@ -67,5 +69,11 @@ export function readTranscriptTail(
         turn.role !== "reset" && (!opts.sessionId || turn.sessionId === opts.sessionId),
     )
     .slice(-limit)
-    .map(({ role, text, at }) => ({ role, text, at }));
+    .map(({ role, text, at, sessionId, wizardAction }) => ({
+      role,
+      text,
+      at,
+      ...(sessionId ? { sessionId } : {}),
+      ...(wizardAction ? { wizardAction } : {}),
+    }));
 }

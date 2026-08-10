@@ -69,11 +69,8 @@ describe("custodian page", () => {
       welcomeVariant: "onboarding",
       message: "connect whatsapp",
     });
-    expect(page.querySelector(".chat-group.user")).toBeNull();
-    expect(page.querySelector("openclaw-option-card")).toBeNull();
-    expect(page.querySelector(".custodian__structured-response")?.textContent).toContain(
-      "Connect WhatsApp",
-    );
+    expect(page.querySelector(".chat-group.user")?.textContent).toContain("Connect WhatsApp");
+    expect(connectOption.disabled).toBe(true);
   });
 
   it("renders and answers rich select, multiselect, and sensitive text wizard steps", async () => {
@@ -870,10 +867,7 @@ describe("custodian page", () => {
     await waitForFast(() => expect(request).toHaveBeenCalledTimes(2));
     await page.updateComplete;
     expect(request.mock.calls[1]?.[1]).toMatchObject({ message: "cancel" });
-    expect(page.querySelector(".chat-group.user")).toBeNull();
-    expect(page.querySelector(".custodian__structured-response")?.textContent).toContain(
-      "Skip for now",
-    );
+    expect(page.querySelector(".chat-group.user")?.textContent).toContain("Skip for now");
     await waitForFast(() => expect(page.querySelector("openclaw-option-card")).toBeNull());
   });
 

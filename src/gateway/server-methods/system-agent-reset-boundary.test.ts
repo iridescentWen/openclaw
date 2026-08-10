@@ -231,7 +231,7 @@ describe("openclaw.chat reset boundary", () => {
           activeWizard: expect.objectContaining({ sessionId: "recover-session" }),
         },
       });
-      expect(historyResponses[0]).not.toHaveProperty("payload.turns.0.sessionId");
+      expect(historyResponses[0]).toHaveProperty("payload.turns.0.sessionId", "recover-session");
     });
   });
 

@@ -99,8 +99,8 @@ export class CustodianSessionStore extends CustodianTranscriptState {
       this.emit();
     },
     replaceMessages: (messages) => (this.messages = messages),
-    sendUserTurn: (client, params, display) =>
-      this.sendUserTurn(client, params, display, true, false),
+    sendUserTurn: (client, params, display, appendUserMessage) =>
+      this.sendUserTurn(client, params, display, true, appendUserMessage),
   });
 
   subscribe(listener: StoreListener): () => void {
