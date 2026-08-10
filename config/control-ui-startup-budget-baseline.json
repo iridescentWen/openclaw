@@ -1,5 +1,5 @@
 {
-  "startupJsGzipBytes": 325675,
-  "reason": "fullscreen terminal route and toolbar open action (PR #121451); CI-measured QA-profile bytes",
+  "startupJsGzipBytes": 326712,
+  "reason": "accumulated main startup growth; scope-upgrade flow is lazy-loaded and startup-neutral (measured -120B vs prior baseline in isolation)",
   "updatedAt": "2026-08-10"
 }
