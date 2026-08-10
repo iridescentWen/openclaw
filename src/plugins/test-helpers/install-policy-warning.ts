@@ -2,6 +2,7 @@ import { expectDefined } from "@openclaw/normalization-core";
 import { expect } from "vitest";
 import type {
   InstallPolicyWarningAcknowledgementRequest,
+  InstallPolicyWarningAcknowledgementResult,
   InstallPolicyWarningOccurrence,
 } from "../install-security-scan.types.js";
 
@@ -22,7 +23,7 @@ export const officialDiffsWarningOccurrence: InstallPolicyWarningOccurrence = {
 type InstallPolicyWarningCall = {
   onInstallPolicyWarning?: (
     request: InstallPolicyWarningAcknowledgementRequest,
-  ) => Promise<boolean>;
+  ) => Promise<InstallPolicyWarningAcknowledgementResult>;
 };
 
 export const officialDiffsWarningRequest = {
@@ -54,6 +55,9 @@ export async function expectOneShotInstallPolicyWarningAcknowledgement(mock: {
     requestMode: "install",
     ...officialDiffsWarningOccurrence,
   };
-  expect(await acknowledge(request)).toBe(true);
-  expect(await acknowledge(request)).toBe(false);
+  expect(await acknowledge(request)).toEqual({ status: "approved" });
+  expect(await acknowledge(request)).toEqual({
+    status: "unavailable",
+    reason: "warning-not-approved",
+  });
 }
