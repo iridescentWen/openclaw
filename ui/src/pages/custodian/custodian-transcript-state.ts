@@ -3,8 +3,10 @@ import type { GatewayBrowserClient } from "../../api/gateway.ts";
 import type { WizardStep } from "../../api/types.ts";
 import type { ApplicationContext } from "../../app/context.ts";
 import {
-  clearCustodianRecoveryForClient,
-  reconcileCustodianRecoveryForClient,
+  captureCustodianRecoveryScope,
+  clearCustodianRecoveryForScope,
+  type CustodianRecoveryScope,
+  reconcileCustodianRecoveryForScope,
 } from "./custodian-recovery.ts";
 import { initialCustodianWizardValue } from "./custodian-wizard-step.ts";
 import type { CustodianStructuredQuestion } from "./structured-question.ts";
@@ -32,14 +34,15 @@ export abstract class CustodianTranscriptState {
   protected nextMessageId = 1;
   protected requestEpoch = 0;
   protected sessionClient: GatewayBrowserClient | null = null;
-  private sessionGatewayUrl: string | null = null;
+  // Reconnect mutates the client's scope; cleanup must keep targeting the identity that wrote the handle.
+  private sessionRecoveryScope: CustodianRecoveryScope | null = null;
   private lastHelloDeviceToken = "";
 
   protected abstract emit(): void;
 
   protected bindSessionRecovery(client: GatewayBrowserClient, gatewayUrl: string): void {
     this.sessionClient = client;
-    this.sessionGatewayUrl = gatewayUrl;
+    this.sessionRecoveryScope = captureCustodianRecoveryScope(client, gatewayUrl);
   }
 
   protected currentSessionOwnershipKey(context: ApplicationContext | null): string {
@@ -54,28 +57,21 @@ export abstract class CustodianTranscriptState {
     return JSON.stringify([gatewayUrl, token, password, bootstrapToken, this.lastHelloDeviceToken]);
   }
 
-  protected clearRecovery(
-    client: GatewayBrowserClient,
-    gatewayUrl: string,
-    expectedSessionId?: string,
-  ): void {
-    clearCustodianRecoveryForClient(client, gatewayUrl, expectedSessionId);
-  }
-
   protected clearSessionRecovery(expectedSessionId = this.sessionId): void {
-    if (!this.sessionClient || this.sessionGatewayUrl === null) {
+    if (!this.sessionRecoveryScope) {
       return;
     }
-    this.clearRecovery(this.sessionClient, this.sessionGatewayUrl, expectedSessionId);
+    clearCustodianRecoveryForScope(this.sessionRecoveryScope, expectedSessionId);
   }
 
   protected reconcileSessionRecovery(
-    client: GatewayBrowserClient,
-    gatewayUrl: string,
     result: SystemAgentChatResult,
     requestSessionId: string,
   ): void {
-    reconcileCustodianRecoveryForClient(client, gatewayUrl, result, requestSessionId);
+    if (!this.sessionRecoveryScope) {
+      return;
+    }
+    reconcileCustodianRecoveryForScope(this.sessionRecoveryScope, result, requestSessionId);
   }
 
   protected async refreshTranscriptHistory(

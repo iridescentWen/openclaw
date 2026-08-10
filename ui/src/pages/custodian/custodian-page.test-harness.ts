@@ -27,6 +27,7 @@ type TestCustodianPage = HTMLElement & {
 type ContextHarness = {
   context: ApplicationContext;
   setGatewaySnapshot: (patch: Partial<ApplicationGatewaySnapshot>) => void;
+  setRecoveryScope: (scope: string) => void;
   setRecoveryScopeReady: (ready: boolean) => void;
   setGatewayUrl: (gatewayUrl: string) => void;
   setGatewayToken: (token: string) => void;
@@ -160,6 +161,13 @@ export function createContext(
     },
     setRecoveryScopeReady: (ready) => {
       clientState.recoveryScopeReady = ready;
+      snapshot = { ...snapshot };
+      for (const listener of listeners) {
+        listener(snapshot);
+      }
+    },
+    setRecoveryScope: (scope) => {
+      clientState.recoveryScope = scope;
       snapshot = { ...snapshot };
       for (const listener of listeners) {
         listener(snapshot);

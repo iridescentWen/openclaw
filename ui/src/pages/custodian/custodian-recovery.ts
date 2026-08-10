@@ -7,6 +7,11 @@ type CustodianRecovery = {
   sessionId: string;
 };
 
+export type CustodianRecoveryScope = {
+  gatewayUrl: string;
+  recoveryScope: string;
+};
+
 function storageKey(gatewayUrl: string, recoveryScope: string): string {
   return `${STORAGE_PREFIX}${gatewayUrl}:${recoveryScope}`;
 }
@@ -15,10 +20,10 @@ function validScope(gatewayUrl: string, recoveryScope: string): boolean {
   return gatewayUrl.trim().length > 0 && recoveryScope.trim().length > 0;
 }
 
-function clientScope(
+export function captureCustodianRecoveryScope(
   client: GatewayBrowserClient,
   gatewayUrl: string,
-): { gatewayUrl: string; recoveryScope: string } | null {
+): CustodianRecoveryScope | null {
   const normalizedGatewayUrl = gatewayUrl.trim();
   const recoveryScope = client.recoveryScopeReady ? (client.recoveryScope?.trim() ?? "") : "";
   return normalizedGatewayUrl && recoveryScope
@@ -30,36 +35,20 @@ export function readCustodianRecoveryForClient(
   client: GatewayBrowserClient,
   gatewayUrl: string,
 ): CustodianRecovery | null {
-  const scope = clientScope(client, gatewayUrl);
+  const scope = captureCustodianRecoveryScope(client, gatewayUrl);
   return scope ? readCustodianRecovery(scope.gatewayUrl, scope.recoveryScope) : null;
 }
 
-export function clearCustodianRecoveryForClient(
-  client: GatewayBrowserClient,
-  gatewayUrl: string,
-  expectedSessionId?: string,
-): void {
-  const scope = clientScope(client, gatewayUrl);
-  if (scope) {
-    clearCustodianRecovery(scope.gatewayUrl, scope.recoveryScope, expectedSessionId);
-  }
-}
-
-export function reconcileCustodianRecoveryForClient(
-  client: GatewayBrowserClient,
-  gatewayUrl: string,
+export function reconcileCustodianRecoveryForScope(
+  scope: CustodianRecoveryScope,
   result: SystemAgentChatResult,
   requestSessionId: string,
 ): void {
-  const scope = clientScope(client, gatewayUrl);
-  if (!scope) {
-    return;
-  }
   if (result.wizardInputPending === true && result.step) {
     writeCustodianRecovery({ ...scope, sessionId: result.sessionId });
     return;
   }
-  clearCustodianRecovery(scope.gatewayUrl, scope.recoveryScope, requestSessionId);
+  clearCustodianRecoveryForScope(scope, requestSessionId);
 }
 
 function readCustodianRecovery(
@@ -112,17 +101,16 @@ function writeCustodianRecovery(params: {
   }
 }
 
-function clearCustodianRecovery(
-  gatewayUrl: string,
-  recoveryScope: string,
+export function clearCustodianRecoveryForScope(
+  scope: CustodianRecoveryScope,
   expectedSessionId?: string,
 ): void {
-  if (!validScope(gatewayUrl, recoveryScope)) {
+  if (!validScope(scope.gatewayUrl, scope.recoveryScope)) {
     return;
   }
   try {
     const storage = globalThis.sessionStorage;
-    const key = storageKey(gatewayUrl, recoveryScope);
+    const key = storageKey(scope.gatewayUrl, scope.recoveryScope);
     if (expectedSessionId) {
       const raw = storage?.getItem(key);
       if (!raw) {

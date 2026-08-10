@@ -2,19 +2,19 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  clearCustodianRecoveryForClient,
+  clearCustodianRecoveryForScope,
   readCustodianRecoveryForClient,
-  reconcileCustodianRecoveryForClient,
+  reconcileCustodianRecoveryForScope,
 } from "./custodian-recovery.ts";
 
 const gatewayUrl = "ws://127.0.0.1:18789";
 const recoveryScope = "principal-a";
+const recoveryOwner = { gatewayUrl, recoveryScope };
 const client = { recoveryScope, recoveryScopeReady: true } as never;
 
 function remember(sessionId: string): void {
-  reconcileCustodianRecoveryForClient(
-    client,
-    gatewayUrl,
+  reconcileCustodianRecoveryForScope(
+    recoveryOwner,
     {
       sessionId,
       reply: "Enter a secret",
@@ -54,9 +54,9 @@ describe("Custodian wizard reload recovery", () => {
     expect(readCustodianRecoveryForClient(client, gatewayUrl)).toBeNull();
 
     remember("custodian-live");
-    clearCustodianRecoveryForClient(client, gatewayUrl, "different-session");
+    clearCustodianRecoveryForScope(recoveryOwner, "different-session");
     expect(readCustodianRecoveryForClient(client, gatewayUrl)).not.toBeNull();
-    clearCustodianRecoveryForClient(client, gatewayUrl, "custodian-live");
+    clearCustodianRecoveryForScope(recoveryOwner, "custodian-live");
     expect(readCustodianRecoveryForClient(client, gatewayUrl)).toBeNull();
   });
 

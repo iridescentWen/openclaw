@@ -667,12 +667,7 @@ export class CustodianSessionStore extends CustodianTranscriptState {
       this.retryParams = null;
       this.setupIssue = null;
       const step = result.step ?? null;
-      this.reconcileSessionRecovery(
-        client,
-        this.context?.gateway.connection.gatewayUrl ?? "",
-        result,
-        params.sessionId,
-      );
+      this.reconcileSessionRecovery(result, params.sessionId);
       const question = step ? null : parseCustodianQuestion(result.question);
       this.wizardValue = step ? initialCustodianWizardValue(step) : undefined;
       this.wizardSecretVisible = false;
@@ -723,11 +718,6 @@ export class CustodianSessionStore extends CustodianTranscriptState {
             : null;
         if (hasCustodianUserInput(params) && isCustodianSessionInvalidatedError(error)) {
           // Retained transcript rows are display context only; the next turn needs a fresh id.
-          this.clearRecovery(
-            client,
-            this.context?.gateway.connection.gatewayUrl ?? "",
-            params.sessionId,
-          );
           this.rotateVolatileSession(client, this.currentSessionVariant());
           this.error = t("custodian.sessionRestarted", { error: custodianErrorMessage(error) });
         }

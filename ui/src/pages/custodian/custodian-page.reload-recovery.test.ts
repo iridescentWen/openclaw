@@ -7,11 +7,12 @@ import { waitForFast } from "../../test-helpers/wait-for.ts";
 import { createContext, mountPage } from "./custodian-page.test-harness.ts";
 import {
   readCustodianRecoveryForClient,
-  reconcileCustodianRecoveryForClient,
+  reconcileCustodianRecoveryForScope,
 } from "./custodian-recovery.ts";
 
 const gatewayUrl = "ws://gateway.test/control";
 const recoveryScope = "principal-a";
+const recoveryOwner = { gatewayUrl, recoveryScope };
 const recoveryClient = { recoveryScope, recoveryScopeReady: true } as never;
 const recoveryCapabilities = [
   GATEWAY_SERVER_CAPS.SYSTEM_AGENT_WIZARD_CANCEL,
@@ -117,9 +118,8 @@ describe("Custodian wizard reload recovery", () => {
   });
 
   it("waits for the authenticated recovery scope before starting a fresh session", async () => {
-    reconcileCustodianRecoveryForClient(
-      recoveryClient,
-      gatewayUrl,
+    reconcileCustodianRecoveryForScope(
+      recoveryOwner,
       {
         sessionId: "delayed-scope-wizard",
         reply: "Enter the secret.",
@@ -175,9 +175,8 @@ describe("Custodian wizard reload recovery", () => {
   });
 
   it("keeps a live recovery handle when its history lookup is temporarily unavailable", async () => {
-    reconcileCustodianRecoveryForClient(
-      recoveryClient,
-      gatewayUrl,
+    reconcileCustodianRecoveryForScope(
+      recoveryOwner,
       {
         sessionId: "retryable-wizard",
         reply: "Enter the secret.",
@@ -283,6 +282,61 @@ describe("Custodian wizard reload recovery", () => {
     expect(readCustodianRecoveryForClient(recoveryClient, gatewayUrl)).toBeNull();
   });
 
+  it("clears the writing scope when the same client changes recovery identity", async () => {
+    let chatCount = 0;
+    const request = vi.fn(async (method: string) => {
+      if (method === "openclaw.chat.history") {
+        return { turns: [] };
+      }
+      chatCount += 1;
+      return chatCount === 1
+        ? {
+            sessionId: "original-scope-wizard",
+            reply: "Enter the secret.",
+            action: "none",
+            wizardInputPending: true,
+            step: {
+              id: "secret",
+              type: "text",
+              message: "Twitch client secret",
+              sensitive: true,
+            },
+          }
+        : {
+            sessionId: "rotated-scope-session",
+            reply: "Rotated scope ready.",
+            action: "none",
+          };
+    });
+    const harness = createContext(request, ["openclaw.chat", "openclaw.chat.history"], {
+      gatewayCapabilities: recoveryCapabilities,
+      recoveryScope,
+    });
+    const { page } = await mountPage(harness.context);
+    await waitForFast(() =>
+      expect(readCustodianRecoveryForClient(recoveryClient, gatewayUrl)).toEqual({
+        sessionId: "original-scope-wizard",
+      }),
+    );
+
+    harness.setRecoveryScopeReady(false);
+    const hello = harness.context.gateway.snapshot.hello!;
+    harness.setGatewaySnapshot({
+      hello: { ...hello, auth: { ...hello.auth!, deviceToken: "rotated-identity" } },
+    });
+    harness.setRecoveryScope("principal-b");
+    harness.setRecoveryScopeReady(true);
+
+    await waitForFast(() => expect(page.textContent).toContain("Rotated scope ready."));
+    expect(readCustodianRecoveryForClient(recoveryClient, gatewayUrl)).toBeNull();
+    expect(
+      readCustodianRecoveryForClient(
+        { recoveryScope: "principal-b", recoveryScopeReady: true } as never,
+        gatewayUrl,
+      ),
+    ).toBeNull();
+  });
+
   it("clears the old gateway recovery key when the connection URL changes", async () => {
     const request = vi.fn(async (method: string) =>
       method === "openclaw.chat.history"
@@ -330,9 +384,8 @@ describe("Custodian wizard reload recovery", () => {
   });
 
   it("starts fresh without sending sessionId to a legacy history method", async () => {
-    reconcileCustodianRecoveryForClient(
-      recoveryClient,
-      gatewayUrl,
+    reconcileCustodianRecoveryForScope(
+      recoveryOwner,
       {
         sessionId: "legacy-wizard",
         reply: "Enter the secret.",
