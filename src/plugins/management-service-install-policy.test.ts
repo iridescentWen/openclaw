@@ -1,6 +1,6 @@
 import { expectDefined } from "@openclaw/normalization-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { InstallPolicyWarningDetails } from "./install-security-scan.types.js";
+import type { InstallPolicyWarningOccurrence } from "./install-security-scan.types.js";
 import {
   expectOneShotInstallPolicyWarningAcknowledgement,
   officialDiffsWarningRequest,
@@ -203,7 +203,7 @@ describe("plugin management install-policy acknowledgements", () => {
     await expectOneShotInstallPolicyWarningAcknowledgement(mocks.clawhubInstall);
   });
 
-  it("acknowledges each reviewed install-policy warning once", async () => {
+  it("acknowledges a reviewed warning only at the same scan stage and only once", async () => {
     mocks.readConfig.mockResolvedValue(configSnapshot());
     mockHostedOfficialCatalog([hostedFeedDiffsEntry]);
     mockClawHubInstall("diffs", "@openclaw/diffs");
@@ -211,13 +211,17 @@ describe("plugin management install-policy acknowledgements", () => {
     mocks.metadata.mockReturnValue(
       metadataSnapshot({ enabled: true, id: "diffs", name: "Diffs", origin: "global" }),
     );
-    const firstWarning: InstallPolicyWarningDetails = expectDefined(
+    const packageWarning: InstallPolicyWarningOccurrence = expectDefined(
       officialDiffsWarningRequest.installPolicyWarningAcknowledgement.warnings[0],
       "first approved warning",
     );
-    const secondWarning: InstallPolicyWarningDetails = {
-      ...firstWarning,
-      reason: "Review the dependency warning",
+    const dependencyWarning: InstallPolicyWarningOccurrence = {
+      scan: {
+        ...packageWarning.scan,
+        originType: "plugin-dependency-tree",
+        pluginContentType: "dependency-tree",
+      },
+      warning: packageWarning.warning,
     };
 
     await installManagedPlugin({
@@ -225,7 +229,7 @@ describe("plugin management install-policy acknowledgements", () => {
         ...officialDiffsWarningRequest,
         installPolicyWarningAcknowledgement: {
           ...officialDiffsWarningRequest.installPolicyWarningAcknowledgement,
-          warnings: [firstWarning, secondWarning],
+          warnings: [packageWarning],
         },
       },
       env: {},
@@ -235,22 +239,32 @@ describe("plugin management install-policy acknowledgements", () => {
     const acknowledge = expectDefined(
       (
         call[0] as {
-          onInstallPolicyWarning?: (request: { warning: typeof firstWarning }) => Promise<boolean>;
+          onInstallPolicyWarning?: (request: {
+            scan: typeof packageWarning.scan;
+            warning: typeof packageWarning.warning;
+          }) => Promise<boolean>;
         }
       ).onInstallPolicyWarning,
       "install-policy acknowledgement callback",
     );
-    expect(await acknowledge({ warning: firstWarning })).toBe(true);
-    expect(await acknowledge({ warning: secondWarning })).toBe(true);
-    expect(await acknowledge({ warning: firstWarning })).toBe(false);
+    expect(await acknowledge(dependencyWarning)).toBe(false);
+    expect(await acknowledge(packageWarning)).toBe(true);
+    expect(await acknowledge(packageWarning)).toBe(false);
   });
 
   it("pins reviewed npm warnings to the first resolved version and integrity", async () => {
-    const warning = {
-      targetName: "npm-demo",
-      targetType: "plugin" as const,
-      requestMode: "install" as const,
-      reason: "Review this npm package",
+    const warning: InstallPolicyWarningOccurrence = {
+      scan: {
+        requestKind: "plugin-npm",
+        originType: "plugin-npm",
+        pluginContentType: "package",
+      },
+      warning: {
+        targetName: "npm-demo",
+        targetType: "plugin",
+        requestMode: "install",
+        reason: "Review this npm package",
+      },
     };
     const npmResolution = {
       name: "@openclaw/npm-demo",
@@ -272,7 +286,7 @@ describe("plugin management install-policy acknowledgements", () => {
     mocks.npmInstall
       .mockResolvedValueOnce({
         ok: false,
-        error: warning.reason,
+        error: warning.warning.reason,
         installPolicyWarning: warning,
         npmResolution,
       })
@@ -323,11 +337,18 @@ describe("plugin management install-policy acknowledgements", () => {
   });
 
   it("keeps npm warnings terminal when immutable resolution metadata is incomplete", async () => {
-    const warning = {
-      targetName: "npm-demo",
-      targetType: "plugin" as const,
-      requestMode: "install" as const,
-      reason: "Review this npm package",
+    const warning: InstallPolicyWarningOccurrence = {
+      scan: {
+        requestKind: "plugin-npm",
+        originType: "plugin-npm",
+        pluginContentType: "package",
+      },
+      warning: {
+        targetName: "npm-demo",
+        targetType: "plugin",
+        requestMode: "install",
+        reason: "Review this npm package",
+      },
     };
     mocks.readConfig.mockResolvedValue(configSnapshot());
     mockHostedOfficialCatalog([
@@ -341,7 +362,7 @@ describe("plugin management install-policy acknowledgements", () => {
     ]);
     mocks.npmInstall.mockResolvedValue({
       ok: false,
-      error: warning.reason,
+      error: warning.warning.reason,
       installPolicyWarning: warning,
       npmResolution: {
         name: "@openclaw/npm-demo",
@@ -370,16 +391,23 @@ describe("plugin management install-policy acknowledgements", () => {
   });
 
   it("pins reviewed ClawHub warnings to the downloaded archive integrity", async () => {
-    const warning = {
-      targetName: "demo",
-      targetType: "plugin" as const,
-      requestMode: "install" as const,
-      reason: "Review this ClawHub package",
+    const warning: InstallPolicyWarningOccurrence = {
+      scan: {
+        requestKind: "plugin-archive",
+        originType: "plugin-package",
+        pluginContentType: "package",
+      },
+      warning: {
+        targetName: "demo",
+        targetType: "plugin",
+        requestMode: "install",
+        reason: "Review this ClawHub package",
+      },
     };
     mocks.readConfig.mockResolvedValue(configSnapshot());
     mocks.clawhubInstall.mockResolvedValue({
       ok: false,
-      error: warning.reason,
+      error: warning.warning.reason,
       installPolicyWarning: warning,
       version: "1.2.3",
       integrity: "sha256-reviewed",

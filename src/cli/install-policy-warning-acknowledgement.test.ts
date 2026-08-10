@@ -47,6 +47,11 @@ describe("resolveInstallPolicyWarningAcknowledgementCliOptions", () => {
         targetName: "demo\npkg",
         targetType: "plugin",
         requestMode: fixture.requestMode,
+        scan: {
+          requestKind: "plugin-npm",
+          originType: "plugin-npm",
+          pluginContentType: "package",
+        },
         warning: {
           targetName: "demo\npkg",
           targetType: "plugin",
@@ -72,6 +77,11 @@ describe("resolveInstallPolicyWarningAcknowledgementCliOptions", () => {
         targetName: "demo",
         targetType: "skill",
         requestMode: "install",
+        scan: {
+          requestKind: "skill-install",
+          originType: "skill-managed-install",
+          skillInstallId: "demo",
+        },
         warning: {
           targetName: "demo",
           targetType: "skill",
@@ -116,6 +126,11 @@ describe("resolveInstallPolicyWarningAcknowledgementCliOptions", () => {
         targetName: "demo",
         targetType: "plugin",
         requestMode: "install",
+        scan: {
+          requestKind: "plugin-npm",
+          originType: "plugin-npm",
+          pluginContentType: "package",
+        },
         warning: {
           targetName: "demo",
           targetType: "plugin",

@@ -17,10 +17,17 @@ describe("installPluginDirectoryIntoExtensions", () => {
     fs.mkdirSync(sourceDir, { recursive: true });
     fs.writeFileSync(path.join(sourceDir, "index.js"), "export default {};\n");
     const installPolicyWarning = {
-      targetName: "demo",
-      targetType: "plugin" as const,
-      requestMode: "install" as const,
-      reason: "Review the installed dependency tree",
+      scan: {
+        requestKind: "plugin-archive" as const,
+        originType: "plugin-dependency-tree",
+        pluginContentType: "dependency-tree" as const,
+      },
+      warning: {
+        targetName: "demo",
+        targetType: "plugin" as const,
+        requestMode: "install" as const,
+        reason: "Review the installed dependency tree",
+      },
     };
 
     const result = await installPluginDirectoryIntoExtensions({
@@ -37,7 +44,7 @@ describe("installPluginDirectoryIntoExtensions", () => {
       depsLogMessage: "Installing dependencies…",
       afterInstall: async () => ({
         ok: false,
-        error: installPolicyWarning.reason,
+        error: installPolicyWarning.warning.reason,
         code: PLUGIN_INSTALL_ERROR_CODE.SECURITY_SCAN_BLOCKED,
         installPolicyWarning,
       }),
@@ -45,7 +52,7 @@ describe("installPluginDirectoryIntoExtensions", () => {
 
     expect(result).toEqual({
       ok: false,
-      error: installPolicyWarning.reason,
+      error: installPolicyWarning.warning.reason,
       code: PLUGIN_INSTALL_ERROR_CODE.SECURITY_SCAN_BLOCKED,
       installPolicyWarning,
     });

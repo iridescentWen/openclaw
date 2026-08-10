@@ -7,7 +7,7 @@ import type {
 } from "../security/install-policy.js";
 export type { InstallSafetyOverrides } from "./install-security-scan.types.js";
 import type {
-  InstallPolicyWarningDetails,
+  InstallPolicyWarningOccurrence,
   InstallSafetyOverrides,
 } from "./install-security-scan.types.js";
 
@@ -20,7 +20,7 @@ export type InstallSecurityScanResult = {
   blocked?: {
     code?: "security_scan_blocked" | "security_scan_failed";
     reason: string;
-    installPolicyWarning?: InstallPolicyWarningDetails;
+    installPolicyWarning?: InstallPolicyWarningOccurrence;
   };
 };
 

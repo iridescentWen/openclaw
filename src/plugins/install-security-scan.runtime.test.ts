@@ -293,6 +293,11 @@ describe("legacy file install scan compatibility", () => {
       targetName: "payload",
       targetType: "plugin",
       requestMode: "install",
+      scan: {
+        requestKind: "plugin-file",
+        originType: "plugin-file",
+        pluginContentType: "file",
+      },
       warning: {
         targetName: "payload",
         targetType: "plugin",
@@ -331,17 +336,24 @@ describe("legacy file install scan compatibility", () => {
     expect(result?.blocked).toMatchObject({
       code: "security_scan_blocked",
       installPolicyWarning: {
-        targetName: "payload",
-        targetType: "plugin",
-        requestMode: "install",
-        reason: "review the new finding",
-        findings: [
-          {
-            ruleId: "changed-warning",
-            severity: "warn",
-            message: "new finding",
-          },
-        ],
+        scan: {
+          requestKind: "plugin-file",
+          originType: "plugin-file",
+          pluginContentType: "file",
+        },
+        warning: {
+          targetName: "payload",
+          targetType: "plugin",
+          requestMode: "install",
+          reason: "review the new finding",
+          findings: [
+            {
+              ruleId: "changed-warning",
+              severity: "warn",
+              message: "new finding",
+            },
+          ],
+        },
       },
     });
     expect(result?.blocked?.reason).toContain("Reason: review the new finding");
@@ -415,10 +427,17 @@ describe("legacy file install scan compatibility", () => {
     expect(result?.blocked).toEqual({
       code: "security_scan_blocked",
       installPolicyWarning: {
-        targetName: "payload",
-        targetType: "plugin",
-        requestMode: "install",
-        reason: "review this plugin",
+        scan: {
+          requestKind: "plugin-file",
+          originType: "plugin-file",
+          pluginContentType: "file",
+        },
+        warning: {
+          targetName: "payload",
+          targetType: "plugin",
+          requestMode: "install",
+          reason: "review this plugin",
+        },
       },
       reason: expectedInstallPolicyNotice({
         decision: "warn",
@@ -500,11 +519,18 @@ describe("legacy file install scan compatibility", () => {
     });
 
     expect(result?.blocked?.installPolicyWarning).toEqual({
-      targetName: "payload",
-      targetType: "plugin",
-      requestMode: "install",
-      reason: "review this plugin",
-      findings: [{ ruleId: "context", severity: "info", message: "Informational context." }],
+      scan: {
+        requestKind: "plugin-file",
+        originType: "plugin-file",
+        pluginContentType: "file",
+      },
+      warning: {
+        targetName: "payload",
+        targetType: "plugin",
+        requestMode: "install",
+        reason: "review this plugin",
+        findings: [{ ruleId: "context", severity: "info", message: "Informational context." }],
+      },
     });
     expect(warnings).toEqual([
       `${expectedInstallPolicyNotice({

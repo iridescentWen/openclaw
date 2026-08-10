@@ -1,6 +1,23 @@
 import { expectDefined } from "@openclaw/normalization-core";
 import { expect } from "vitest";
-import type { InstallPolicyWarningAcknowledgementRequest } from "../install-security-scan.types.js";
+import type {
+  InstallPolicyWarningAcknowledgementRequest,
+  InstallPolicyWarningOccurrence,
+} from "../install-security-scan.types.js";
+
+export const officialDiffsWarningOccurrence: InstallPolicyWarningOccurrence = {
+  scan: {
+    requestKind: "plugin-archive",
+    originType: "plugin-package",
+    pluginContentType: "package",
+  },
+  warning: {
+    targetName: "diffs",
+    targetType: "plugin",
+    requestMode: "install",
+    reason: "Review this warning",
+  },
+};
 
 type InstallPolicyWarningCall = {
   onInstallPolicyWarning?: (
@@ -18,14 +35,7 @@ export const officialDiffsWarningRequest = {
       expectedPluginId: "diffs",
       expectedIntegrity: `sha256-${Buffer.from("a".repeat(64), "hex").toString("base64")}`,
     },
-    warnings: [
-      {
-        targetName: "diffs",
-        targetType: "plugin",
-        requestMode: "install",
-        reason: "Review this warning",
-      },
-    ],
+    warnings: [officialDiffsWarningOccurrence],
   },
 } as const;
 
@@ -42,12 +52,7 @@ export async function expectOneShotInstallPolicyWarningAcknowledgement(mock: {
     targetName: "diffs",
     targetType: "plugin",
     requestMode: "install",
-    warning: {
-      targetName: "diffs",
-      targetType: "plugin",
-      requestMode: "install",
-      reason: "Review this warning",
-    },
+    ...officialDiffsWarningOccurrence,
   };
   expect(await acknowledge(request)).toBe(true);
   expect(await acknowledge(request)).toBe(false);

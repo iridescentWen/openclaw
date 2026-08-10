@@ -40,7 +40,7 @@ import {
 } from "./install-persistence.js";
 import { commitPluginInstallRecordsWithConfig } from "./install-record-commit.js";
 import type { InstallSafetyOverrides } from "./install-security-scan.js";
-import type { InstallPolicyWarningDetails } from "./install-security-scan.types.js";
+import type { InstallPolicyWarningOccurrence } from "./install-security-scan.types.js";
 import type { PluginInstallLogger } from "./install-types.js";
 import {
   installPluginFromNpmPackArchive,
@@ -125,7 +125,7 @@ export type ManagedPluginInstallRequest =
       version?: string;
       acknowledgeClawHubRisk?: boolean;
       installPolicyWarningAcknowledgement?: {
-        warnings: InstallPolicyWarningDetails[];
+        warnings: InstallPolicyWarningOccurrence[];
         resolvedRequest: ManagedPluginSourceInstallRequest;
       };
     }
@@ -133,7 +133,7 @@ export type ManagedPluginInstallRequest =
       source: "official";
       pluginId: string;
       installPolicyWarningAcknowledgement?: {
-        warnings: InstallPolicyWarningDetails[];
+        warnings: InstallPolicyWarningOccurrence[];
         resolvedRequest: ManagedPluginSourceInstallRequest;
       };
     };
@@ -205,7 +205,7 @@ type ManagedPluginSourceInstallResult =
       integrity?: string;
       version?: string;
       warning?: string;
-      installPolicyWarning?: InstallPolicyWarningDetails;
+      installPolicyWarning?: InstallPolicyWarningOccurrence;
       npmResolution?: NpmSpecResolution;
     };
 
@@ -217,7 +217,7 @@ type SourceInstallerResult =
       integrity?: string;
       version?: string;
       warning?: string;
-      installPolicyWarning?: InstallPolicyWarningDetails;
+      installPolicyWarning?: InstallPolicyWarningOccurrence;
       npmResolution?: NpmSpecResolution;
     }
   | {
@@ -233,8 +233,8 @@ export class ManagedPluginLifecycleError extends Error {
   readonly code?: string;
   readonly version?: string;
   readonly warning?: string;
-  readonly installPolicyWarning?: InstallPolicyWarningDetails;
-  readonly installPolicyAcknowledgedWarnings?: InstallPolicyWarningDetails[];
+  readonly installPolicyWarning?: InstallPolicyWarningOccurrence;
+  readonly installPolicyAcknowledgedWarnings?: InstallPolicyWarningOccurrence[];
   readonly installPolicyResolvedRequest?: ManagedPluginSourceInstallRequest;
 
   constructor(
@@ -244,8 +244,8 @@ export class ManagedPluginLifecycleError extends Error {
       code?: string;
       version?: string;
       warning?: string;
-      installPolicyWarning?: InstallPolicyWarningDetails;
-      installPolicyAcknowledgedWarnings?: InstallPolicyWarningDetails[];
+      installPolicyWarning?: InstallPolicyWarningOccurrence;
+      installPolicyAcknowledgedWarnings?: InstallPolicyWarningOccurrence[];
       installPolicyResolvedRequest?: ManagedPluginSourceInstallRequest;
       cause?: unknown;
     },
@@ -1046,11 +1046,11 @@ function throwInstallFailure(
     integrity?: string;
     version?: string;
     warning?: string;
-    installPolicyWarning?: InstallPolicyWarningDetails;
+    installPolicyWarning?: InstallPolicyWarningOccurrence;
     npmResolution?: NpmSpecResolution;
   },
   resolvedRequest?: ManagedPluginSourceInstallRequest,
-  installPolicyAcknowledgedWarnings?: InstallPolicyWarningDetails[],
+  installPolicyAcknowledgedWarnings?: InstallPolicyWarningOccurrence[],
 ): never {
   const installPolicyResolvedRequest =
     result.installPolicyWarning && resolvedRequest
@@ -1512,7 +1512,7 @@ export async function installManagedPlugin(params: {
     const remainingInstallPolicyWarnings = [
       ...(params.request.installPolicyWarningAcknowledgement?.warnings ?? []),
     ];
-    const acknowledgedInstallPolicyWarnings: InstallPolicyWarningDetails[] = [];
+    const acknowledgedInstallPolicyWarnings: InstallPolicyWarningOccurrence[] = [];
     const request =
       params.request.installPolicyWarningAcknowledgement?.resolvedRequest ??
       (params.request.source === "clawhub"
@@ -1533,9 +1533,11 @@ export async function installManagedPlugin(params: {
       ...(params.request.installPolicyWarningAcknowledgement
         ? {
             safetyOverrides: {
-              onInstallPolicyWarning: async ({ warning }) => {
-                const warningIndex = remainingInstallPolicyWarnings.findIndex((approved) =>
-                  isDeepStrictEqual(warning, approved),
+              onInstallPolicyWarning: async ({ scan, warning }) => {
+                const warningIndex = remainingInstallPolicyWarnings.findIndex(
+                  (approved) =>
+                    isDeepStrictEqual(scan, approved.scan) &&
+                    isDeepStrictEqual(warning, approved.warning),
                 );
                 if (warningIndex < 0) {
                   return false;
