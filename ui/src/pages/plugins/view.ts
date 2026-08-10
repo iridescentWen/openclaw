@@ -390,9 +390,7 @@ function renderRowMessage(
     const reviewBody =
       findings.length === 0
         ? t("pluginsPage.policyReviewBodyUnknown")
-        : findings.length === 1
-          ? t("pluginsPage.policyReviewBodyOne")
-          : t("pluginsPage.policyReviewBodyMany", { count: String(findings.length) });
+        : t("pluginsPage.policyReviewBodyKnown", { count: String(findings.length) });
     return html`
       <div class="plugins-row-message plugins-row-message--warning" role="alert">
         <div class="plugins-policy-review__header">
@@ -409,11 +407,6 @@ function renderRowMessage(
               <section class="plugins-policy-review__findings-panel">
                 <div class="plugins-policy-review__findings-heading">
                   <span>${t("pluginsPage.policyReviewFindings")}</span>
-                  <span class="plugins-policy-review__count"
-                    >${t("pluginsPage.policyReviewFindingCount", {
-                      count: String(findings.length),
-                    })}</span
-                  >
                 </div>
                 <ul class="plugins-policy-review__findings">
                   ${findings.map(
@@ -429,9 +422,6 @@ function renderRowMessage(
             `
           : html`
               <section class="plugins-policy-review__findings-panel">
-                <span class="plugins-policy-review__findings-heading"
-                  >${t("pluginsPage.policyReviewReason")}</span
-                >
                 <p class="plugins-policy-review__reason">${details.reason}</p>
               </section>
             `}
@@ -482,9 +472,6 @@ function renderRowMessage(
             `
           : nothing}
         <div class="plugins-policy-review__footer">
-          <span class="plugins-policy-review__guidance"
-            >${t("pluginsPage.policyReviewGuidance")}</span
-          >
           <div class="plugins-policy-review__actions">
             <button
               type="button"

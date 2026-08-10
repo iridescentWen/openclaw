@@ -689,8 +689,8 @@ describeControlUiE2e("Control UI Plugins mocked Gateway E2E", () => {
       const review = row.getByRole("alert");
       await review.waitFor({ state: "visible" });
       expect(await review.textContent()).toContain("Security review needed");
-      expect(await review.textContent()).toContain("Your install policy found 1 warning");
-      expect(await review.textContent()).toContain("This plugin has not been installed");
+      expect(await review.textContent()).toContain("Policy warnings: 1");
+      expect(await review.textContent()).toContain("Not installed");
       expect(await review.textContent()).toContain("Semgrep found a risky command.");
       expect(await review.textContent()).not.toContain("raw terminal install-policy output");
       await captureScreenshot(page, "09-policy-review-desktop.png");

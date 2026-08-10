@@ -715,16 +715,16 @@ describe("renderPlugins", () => {
     );
     const alert = expectDefined(row.querySelector('[role="alert"]'), "install policy warning");
     expect(normalizedText(alert)).toContain("Security review needed");
-    expect(normalizedText(alert)).toContain("Your install policy found 1 warning");
-    expect(normalizedText(alert)).toContain("This plugin has not been installed");
-    expect(normalizedText(alert)).toContain("Policy findings");
+    expect(normalizedText(alert)).toContain("Policy warnings: 1");
+    expect(normalizedText(alert)).toContain("Not installed");
+    expect(normalizedText(alert)).toContain("Findings");
     expect(normalizedText(alert)).toContain("Semgrep found a risky command.");
     const technicalDetails = expectDefined(
       alert.querySelector<HTMLDetailsElement>(".plugins-policy-review__details"),
       "install policy scan details",
     );
     expect(technicalDetails.open).toBe(false);
-    expect(normalizedText(technicalDetails.querySelector("summary"))).toBe("Scan details");
+    expect(normalizedText(technicalDetails.querySelector("summary"))).toBe("Details");
     expect(
       technicalDetails?.querySelector(".plugins-policy-review__details-chevron svg"),
     ).not.toBeNull();
