@@ -27,6 +27,40 @@ describe("system-agent transcript store", () => {
     });
   });
 
+  it("returns only turns owned by a recovered session", async () => {
+    await withTempDir({ prefix: "openclaw-system-agent-transcript-session-" }, async (stateDir) => {
+      const env = { ...process.env, OPENCLAW_STATE_DIR: stateDir };
+      appendTranscriptTurn(
+        { role: "user", text: "session one question", at: 1, sessionId: "session-one" },
+        { env },
+      );
+      appendTranscriptTurn(
+        { role: "user", text: "session two question", at: 2, sessionId: "session-two" },
+        { env },
+      );
+      appendTranscriptTurn(
+        { role: "assistant", text: "session one answer", at: 3, sessionId: "session-one" },
+        { env },
+      );
+      closeOpenClawStateDatabase();
+
+      expect(readTranscriptTail(2, { env, sessionId: "session-one" })).toEqual([
+        {
+          role: "user",
+          text: "session one question",
+          at: 1,
+          sessionId: "session-one",
+        },
+        {
+          role: "assistant",
+          text: "session one answer",
+          at: 3,
+          sessionId: "session-one",
+        },
+      ]);
+      expect(readTranscriptTail(0, { env, sessionId: "session-one" })).toEqual([]);
+    });
+  });
   it("prunes the oldest rows beyond the rolling retention limit", async () => {
     await withTempDir({ prefix: "openclaw-system-agent-transcript-prune-" }, async (stateDir) => {
       const env = { ...process.env, OPENCLAW_STATE_DIR: stateDir };

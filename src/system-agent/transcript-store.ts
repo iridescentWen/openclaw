@@ -42,15 +42,24 @@ export function appendTranscriptReset(opts: { env?: NodeJS.ProcessEnv } = {}): v
  */
 export function readTranscriptTail(
   limit: number,
-  opts: { afterLastReset?: boolean; env?: NodeJS.ProcessEnv } = {},
+  opts: { afterLastReset?: boolean; env?: NodeJS.ProcessEnv; sessionId?: string } = {},
 ): SystemAgentTranscriptTurn[] {
+  if (limit <= 0) {
+    return [];
+  }
+  const readLimit = opts.sessionId ? SYSTEM_AGENT_TRANSCRIPT_MAX_ENTRIES : limit;
   const entries = openTranscriptStore(opts.env)
-    .latest({ limit })
+    .latest({ limit: readLimit })
     .toReversed()
     .map((entry) => entry.value);
   const resetIndex = opts.afterLastReset
     ? entries.findLastIndex((turn) => turn.role === "reset")
     : -1;
   const window = opts.afterLastReset ? entries.slice(resetIndex + 1) : entries;
-  return window.filter((turn): turn is SystemAgentTranscriptTurn => turn.role !== "reset");
+  return window
+    .filter(
+      (turn): turn is SystemAgentTranscriptTurn =>
+        turn.role !== "reset" && (!opts.sessionId || turn.sessionId === opts.sessionId),
+    )
+    .slice(-limit);
 }

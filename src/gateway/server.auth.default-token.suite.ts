@@ -163,6 +163,9 @@ export function registerDefaultAuthTokenSuite(): void {
         GATEWAY_SERVER_CAPS.SYSTEM_AGENT_WIZARD_CANCEL,
       );
       expect(payload?.features?.capabilities).toContain(
+        GATEWAY_SERVER_CAPS.SYSTEM_AGENT_CHAT_HISTORY_SESSION_RECOVERY,
+      );
+      expect(payload?.features?.capabilities).toContain(
         GATEWAY_SERVER_CAPS.SYSTEM_AGENT_SETUP_MODEL_REF,
       );
       expect(payload?.features?.capabilities).toContain(
