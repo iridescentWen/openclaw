@@ -703,8 +703,10 @@ export class CustodianSessionStore {
         return "sent";
       }
       this.sessionId = result.sessionId;
-      // An authoritative recovery response supersedes a failed QR acknowledgement.
-      this.error = null;
+      if (pollStepId) {
+        // An authoritative QR observation supersedes a failed acknowledgement or prior poll.
+        this.error = null;
+      }
       if (pollStepId && result.step?.type === "qr" && result.step.id === pollStepId) {
         if (
           options.qrPresentationGeneration !== undefined &&
