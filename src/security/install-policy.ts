@@ -549,7 +549,9 @@ export async function runInstallPolicy(params: {
     return failClosed(`policy command exited with code ${String(result.code)}`);
   }
 
-  const parsed = parseInstallPolicyResponse(result.stdout);
+  const parsed = parseInstallPolicyResponse(result.stdout, {
+    sourcePath: params.request.sourcePath,
+  });
   if (parsed.blocked) {
     return logBlocked(parsed);
   }

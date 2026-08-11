@@ -105,10 +105,30 @@ function truncateFinding(finding: InstallPolicyFinding): InstallPolicyFinding {
   };
 }
 
-function fingerprintWarning(reason: string, findings: InstallPolicyFinding[]): string {
+function splitFingerprintText(value: string, sourcePath: string): string[] {
+  return sourcePath ? value.split(sourcePath) : [value];
+}
+
+function fingerprintWarning(
+  reason: string,
+  findings: InstallPolicyFinding[],
+  sourcePath: string,
+): string {
   // Presentation is truncated and capped; approval must bind the complete
-  // validated warning so hidden suffix or overflow changes still fail closed.
-  return createHash("sha256").update(JSON.stringify({ reason, findings })).digest("hex");
+  // validated warning. Physical staging roots vary across equivalent retries,
+  // so fingerprint their position without binding to the ephemeral path bytes.
+  const fingerprintInput = {
+    reason: splitFingerprintText(reason, sourcePath),
+    findings: findings.map((finding) => ({
+      ruleId: splitFingerprintText(finding.ruleId, sourcePath),
+      severity: finding.severity,
+      message: splitFingerprintText(finding.message, sourcePath),
+      ...(finding.file ? { file: splitFingerprintText(finding.file, sourcePath) } : {}),
+      ...(finding.line !== undefined ? { line: finding.line } : {}),
+      ...(finding.evidence ? { evidence: splitFingerprintText(finding.evidence, sourcePath) } : {}),
+    })),
+  };
+  return createHash("sha256").update(JSON.stringify(fingerprintInput)).digest("hex");
 }
 
 function formatPolicyResponseEnvelopeError(error: z.ZodError): string {
@@ -120,7 +140,10 @@ function formatPolicyResponseEnvelopeError(error: z.ZodError): string {
       : 'policy response decision must be "allow", "warn", or "block"';
 }
 
-export function parseInstallPolicyResponse(stdout: string): InstallPolicyResult {
+export function parseInstallPolicyResponse(
+  stdout: string,
+  params: { sourcePath: string },
+): InstallPolicyResult {
   const trimmed = stdout.trim();
   if (!trimmed) {
     return createInstallPolicyFailure("policy command returned empty stdout");
@@ -160,7 +183,7 @@ export function parseInstallPolicyResponse(stdout: string): InstallPolicyResult 
     return {
       warning: {
         reason: truncateText(reason.data, MAX_REASON_CHARS),
-        fingerprint: fingerprintWarning(reason.data, fullFindings),
+        fingerprint: fingerprintWarning(reason.data, fullFindings, params.sourcePath),
       },
       ...(normalizedFindings.length > 0 ? { findings: normalizedFindings } : {}),
     };

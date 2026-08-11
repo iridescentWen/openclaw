@@ -467,6 +467,36 @@ describe("runInstallPolicy", () => {
     expect(first?.warning?.fingerprint).not.toBe(second?.warning?.fingerprint);
   });
 
+  it("keeps warning fingerprints stable across equivalent staging paths", async () => {
+    const runWarning = async (stagingPath: string) =>
+      await runInstallPolicy({
+        config: configWithPolicy(scriptPath, {
+          POLICY_RESPONSE: JSON.stringify({
+            protocolVersion: 1,
+            decision: "warn",
+            reason: `review staged source ${stagingPath}`,
+            findings: [
+              {
+                ruleId: "staged-source",
+                severity: "warn",
+                message: `review ${stagingPath}`,
+                file: `${stagingPath}/src/index.ts`,
+                evidence: `scanner read ${stagingPath}`,
+              },
+            ],
+          }),
+        }),
+        request: baseRequest(stagingPath),
+      });
+
+    const first = await runWarning("/tmp/openclaw-stage-a");
+    const second = await runWarning("/tmp/openclaw-stage-b");
+
+    expect(first?.warning?.fingerprint).toBe(second?.warning?.fingerprint);
+    expect(first?.warning?.reason).not.toBe(second?.warning?.reason);
+    expect(first?.findings).not.toEqual(second?.findings);
+  });
+
   it("fails closed when a warning has more valid findings than can be reviewed", async () => {
     const findings = Array.from({ length: 101 }, (_, index) => ({
       ruleId: `finding-${String(index)}`,
