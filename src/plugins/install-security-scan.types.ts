@@ -30,7 +30,7 @@ export type InstallPolicyWarningAcknowledgementRequest = InstallPolicyWarningOcc
   requestMode: "install" | "update";
 };
 
-export type InstallPolicyWarningAcknowledgementResult =
+type InstallPolicyWarningAcknowledgementResult =
   | { status: "approved" }
   | { status: "declined" }
   | {
