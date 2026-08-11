@@ -33,7 +33,8 @@ function formatInstallPolicyFinding(finding: InstallPolicyFinding): string {
   const location = finding.file
     ? ` (${sanitizeTerminalText(finding.file)}${finding.line ? `:${finding.line}` : ""})`
     : "";
-  return `${sanitizeTerminalText(finding.message)}${location}`;
+  const evidence = finding.evidence ? ` Evidence: ${sanitizeTerminalText(finding.evidence)}` : "";
+  return `[${finding.severity.toUpperCase()}] ${sanitizeTerminalText(finding.ruleId)}: ${sanitizeTerminalText(finding.message)}${location}${evidence}`;
 }
 
 function formatInstallPolicyNotice(params: {

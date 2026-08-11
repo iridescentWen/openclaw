@@ -382,21 +382,29 @@ describe("legacy file install scan compatibility", () => {
     expect(runInstallPolicyMock).toHaveBeenCalledTimes(2);
   });
 
-  it("requires approval again when the full warning changes behind identical display values", async () => {
+  it("renders metadata changes that require approval again", async () => {
     const onInstallPolicyWarning = vi.fn().mockResolvedValue({ status: "approved" });
-    const displayedWarning = {
+    const initialWarning = {
       warning: { reason: "same bounded reason", fingerprint: "full-warning-a" },
       findings: [
         {
-          ruleId: "same-bounded-finding",
+          ruleId: "initial-rule",
           severity: "warn" as const,
           message: "same bounded message",
+          evidence: "initial evidence",
         },
       ],
     };
-    runInstallPolicyMock.mockResolvedValueOnce(displayedWarning).mockResolvedValueOnce({
-      ...displayedWarning,
-      warning: { ...displayedWarning.warning, fingerprint: "full-warning-b" },
+    runInstallPolicyMock.mockResolvedValueOnce(initialWarning).mockResolvedValueOnce({
+      warning: { ...initialWarning.warning, fingerprint: "full-warning-b" },
+      findings: [
+        {
+          ruleId: "refreshed-rule",
+          severity: "critical",
+          message: "same bounded message",
+          evidence: "refreshed evidence",
+        },
+      ],
     });
 
     const result = await scanFileInstallSourceRuntime({
@@ -408,6 +416,11 @@ describe("legacy file install scan compatibility", () => {
 
     expect(result?.blocked?.reason).toContain("The policy warning changed after approval.");
     expect(result?.blocked?.reason).toContain("same bounded reason");
+    expect(result?.blocked?.reason).toContain(
+      "[CRITICAL] refreshed-rule: same bounded message Evidence: refreshed evidence",
+    );
+    expect(result?.blocked?.reason).not.toContain("initial-rule");
+    expect(result?.blocked?.reason).not.toContain("initial evidence");
     expect(onInstallPolicyWarning).toHaveBeenCalledTimes(1);
     expect(runInstallPolicyMock).toHaveBeenCalledTimes(2);
   });
@@ -527,7 +540,7 @@ describe("legacy file install scan compatibility", () => {
     expect(warnings).toEqual([
       `${expectedInstallPolicyNotice({
         decision: "warn",
-        findings: ["Informational context."],
+        findings: ["[INFO] context: Informational context."],
         reason: "review this plugin",
         targetName: "payload",
         targetType: "plugin",
@@ -553,7 +566,7 @@ describe("legacy file install scan compatibility", () => {
     expect(result?.blocked?.reason).toBe(
       expectedInstallPolicyNotice({
         decision: "block",
-        findings: ["Unsafe package."],
+        findings: ["[CRITICAL] blocked: Unsafe package."],
         reason: "unapproved source",
         targetName: "payload",
         targetType: "plugin",
@@ -603,7 +616,7 @@ describe("legacy file install scan compatibility", () => {
     });
 
     expect(result).toBeUndefined();
-    expect(warnings).toEqual(["Install policy: Registry requires review."]);
+    expect(warnings).toEqual(["Install policy: [WARN] registry-review: Registry requires review."]);
     expect(runInstallPolicyMock).toHaveBeenCalledWith({
       config: undefined,
       logger: expect.any(Object),
