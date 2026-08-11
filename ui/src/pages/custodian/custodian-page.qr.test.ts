@@ -467,6 +467,46 @@ describe("custodian QR wizard step", () => {
     expect(page.textContent).toContain("Fresh session ready.");
   });
 
+  it("starts fresh when a successful reconnect drops the authenticated user", async () => {
+    vi.useFakeTimers();
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(qrResult())
+      .mockResolvedValueOnce(terminalResult("Fresh device session.", "replacement-session"));
+    const { context, setGatewaySnapshot } = createContext(request, ["openclaw.chat"], {
+      connectionId: "connection-1",
+      deviceId: "device-1",
+      processInstanceId: "gateway-process-1",
+    });
+    setGatewaySnapshot({
+      selfUser: { id: "profile-1", email: "owner@example.com" },
+    });
+    const { page } = await mountPage(context);
+    await vi.advanceTimersByTimeAsync(0);
+    const hello = context.gateway.snapshot.hello;
+    if (!hello) {
+      throw new Error("expected connected Gateway hello");
+    }
+
+    setGatewaySnapshot({
+      client: {
+        request,
+        authenticatedDeviceId: "device-2",
+      } as unknown as GatewayBrowserClient,
+      hello: { ...hello, server: { connId: "connection-2" } },
+      selfUser: null,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    await page.updateComplete;
+
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls[1]?.[1]).not.toHaveProperty("pollStepId");
+    expect(request.mock.calls[1]?.[1]?.sessionId).not.toBe(SESSION_ID);
+    expect(page.querySelector(".wizard-step__qr")).toBeNull();
+    expect(page.store.messages.some((message) => message.step?.qrDataUrl)).toBe(false);
+    expect(page.textContent).toContain("Fresh device session.");
+  });
+
   it("resumes the same QR session after a client replacement", async () => {
     vi.useFakeTimers();
     const request = vi

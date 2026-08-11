@@ -59,30 +59,13 @@ function resolveCustodianOwner(params: {
       authenticatedUserKey: userOwner,
     };
   }
-  if (previousUser) {
-    return { ownerKey: previousOwner, authenticatedUserKey: previousUser };
-  }
-  if (previousOwner?.startsWith("device:")) {
-    const ownerKey =
-      deviceOwner === previousOwner
-        ? previousOwner
-        : (deviceOwner ?? connectionOwner ?? previousOwner);
-    return { ownerKey, authenticatedUserKey: null };
-  }
-  if (previousOwner?.startsWith("connection:")) {
-    const ownerKey =
-      connectionOwner === previousOwner
-        ? previousOwner
-        : (deviceOwner ?? connectionOwner ?? previousOwner);
-    return { ownerKey, authenticatedUserKey: null };
-  }
   return {
-    ownerKey: deviceOwner ?? connectionOwner ?? previousOwner,
+    ownerKey: deviceOwner ?? connectionOwner,
     authenticatedUserKey: null,
   };
 }
 
-/** Pins continuity to authenticated lineage so later presence cannot rotate live setup. */
+/** Only transport gaps inherit continuity; each successful hello owns its current identity facts. */
 export function resolveCustodianSessionContinuity(params: {
   connection: ApplicationGatewayConnection;
   snapshot: ApplicationGatewaySnapshot;
