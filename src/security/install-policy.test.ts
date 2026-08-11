@@ -438,6 +438,7 @@ describe("runInstallPolicy", () => {
       warning: {
         reason: "review this source",
         fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+        approvalFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
       },
       findings: [
         {
@@ -465,9 +466,10 @@ describe("runInstallPolicy", () => {
 
     expect(first?.warning?.reason).toBe(second?.warning?.reason);
     expect(first?.warning?.fingerprint).not.toBe(second?.warning?.fingerprint);
+    expect(first?.warning?.approvalFingerprint).not.toBe(second?.warning?.approvalFingerprint);
   });
 
-  it("keeps warning fingerprints stable across equivalent staging paths", async () => {
+  it("keeps approval fingerprints stable across equivalent staging paths", async () => {
     const runWarning = async (stagingPath: string) =>
       await runInstallPolicy({
         config: configWithPolicy(scriptPath, {
@@ -492,7 +494,8 @@ describe("runInstallPolicy", () => {
     const first = await runWarning("/tmp/openclaw-stage-a");
     const second = await runWarning("/tmp/openclaw-stage-b");
 
-    expect(first?.warning?.fingerprint).toBe(second?.warning?.fingerprint);
+    expect(first?.warning?.fingerprint).not.toBe(second?.warning?.fingerprint);
+    expect(first?.warning?.approvalFingerprint).toBe(second?.warning?.approvalFingerprint);
     expect(first?.warning?.reason).not.toBe(second?.warning?.reason);
     expect(first?.findings).not.toEqual(second?.findings);
   });
@@ -550,6 +553,7 @@ describe("runInstallPolicy", () => {
     expect(result?.warning).toEqual({
       reason: "review valid findings",
       fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+      approvalFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
     expect(result?.findings).toEqual([
       {

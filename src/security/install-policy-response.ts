@@ -20,7 +20,7 @@ export type InstallPolicyResult =
   | { blocked?: undefined; warning?: undefined; findings?: InstallPolicyFinding[] }
   | {
       blocked?: undefined;
-      warning: { reason: string; fingerprint: string };
+      warning: { reason: string; fingerprint: string; approvalFingerprint: string };
       findings?: InstallPolicyFinding[];
     }
   | {
@@ -105,27 +105,32 @@ function truncateFinding(finding: InstallPolicyFinding): InstallPolicyFinding {
   };
 }
 
-function splitFingerprintText(value: string, sourcePath: string): string[] {
+function fingerprintWarning(reason: string, findings: InstallPolicyFinding[]): string {
+  return createHash("sha256").update(JSON.stringify({ reason, findings })).digest("hex");
+}
+
+function normalizeApprovalFingerprintText(value: string, sourcePath: string): string[] {
   return sourcePath ? value.split(sourcePath) : [value];
 }
 
-function fingerprintWarning(
+function fingerprintWarningApproval(
   reason: string,
   findings: InstallPolicyFinding[],
   sourcePath: string,
 ): string {
   // Presentation is truncated and capped; approval must bind the complete
-  // validated warning. Physical staging roots vary across equivalent retries,
-  // so fingerprint their position without binding to the ephemeral path bytes.
+  // validated warning while excluding the transport-only staging path.
   const fingerprintInput = {
-    reason: splitFingerprintText(reason, sourcePath),
+    reason: normalizeApprovalFingerprintText(reason, sourcePath),
     findings: findings.map((finding) => ({
-      ruleId: splitFingerprintText(finding.ruleId, sourcePath),
+      ruleId: normalizeApprovalFingerprintText(finding.ruleId, sourcePath),
       severity: finding.severity,
-      message: splitFingerprintText(finding.message, sourcePath),
-      ...(finding.file ? { file: splitFingerprintText(finding.file, sourcePath) } : {}),
+      message: normalizeApprovalFingerprintText(finding.message, sourcePath),
+      ...(finding.file ? { file: normalizeApprovalFingerprintText(finding.file, sourcePath) } : {}),
       ...(finding.line !== undefined ? { line: finding.line } : {}),
-      ...(finding.evidence ? { evidence: splitFingerprintText(finding.evidence, sourcePath) } : {}),
+      ...(finding.evidence
+        ? { evidence: normalizeApprovalFingerprintText(finding.evidence, sourcePath) }
+        : {}),
     })),
   };
   return createHash("sha256").update(JSON.stringify(fingerprintInput)).digest("hex");
@@ -183,7 +188,12 @@ export function parseInstallPolicyResponse(
     return {
       warning: {
         reason: truncateText(reason.data, MAX_REASON_CHARS),
-        fingerprint: fingerprintWarning(reason.data, fullFindings, params.sourcePath),
+        fingerprint: fingerprintWarning(reason.data, fullFindings),
+        approvalFingerprint: fingerprintWarningApproval(
+          reason.data,
+          fullFindings,
+          params.sourcePath,
+        ),
       },
       ...(normalizedFindings.length > 0 ? { findings: normalizedFindings } : {}),
     };
