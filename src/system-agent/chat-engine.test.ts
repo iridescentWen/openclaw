@@ -1127,6 +1127,55 @@ describe("SystemAgentChatEngine", () => {
     expect(cancelled).not.toHaveProperty("wizardInputPending");
   });
 
+  it("keeps timed-out QR cancellation fenced until runner cleanup finishes", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_800_000_000_000);
+    let settleOwner!: () => void;
+    const owner = new Promise<void>((resolve) => {
+      settleOwner = resolve;
+    });
+    let cleanupStarted = false;
+    let releaseCleanup!: () => void;
+    const cleanup = new Promise<void>((resolve) => {
+      releaseCleanup = resolve;
+    });
+    let runnerCount = 0;
+    const engine = createQrEngine(async (_channel, prompter) => {
+      runnerCount += 1;
+      await prompter.qrCode?.({
+        title: "Link a device",
+        message: "Scan this QR code, then continue.",
+        text: QR_TEXT,
+        dismissed: owner,
+        expiresAtMs: Date.now() + 60_000,
+      });
+      await owner;
+      cleanupStarted = true;
+      await cleanup;
+    });
+    const prompt = await engine.handle("connect telegram");
+    const stepId = expectDefined(prompt.step, "QR step").id;
+    await engine.answerWizard({ stepId });
+    settleOwner();
+    await vi.waitFor(() => expect(cleanupStarted).toBe(true));
+
+    await vi.advanceTimersByTimeAsync(25 * 60_000);
+
+    await expect(engine.pollStep(stepId)).resolves.toMatchObject({
+      text: "Setup is still finishing the QR attempt.",
+      wizardSettling: true,
+    });
+    expect(engine.hasPendingQrCode()).toBe(true);
+    expect(await engine.handle("connect telegram")).toMatchObject({ wizardSettling: true });
+    expect(runnerCount).toBe(1);
+
+    releaseCleanup();
+    await vi.waitFor(() => expect(engine.hasPendingQrCode()).toBe(false));
+    await expect(engine.pollStep(stepId)).resolves.toMatchObject({
+      text: expect.stringContaining("setup cancelled"),
+    });
+  });
+
   it("polls a QR step until its owner reports the terminal result", async () => {
     let settleOwner!: () => void;
     const owner = new Promise<void>((resolve) => {

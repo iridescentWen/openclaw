@@ -166,6 +166,7 @@ type HostedWizardRunResult = void | HostedWizardCompletion | HostedMemoryImportO
 type ActiveWizardBridge = {
   session: WizardSession;
   step: WizardStep | null;
+  cancellationSettlement: Promise<void> | null;
   expiryTimer: ReturnType<typeof setTimeout> | undefined;
   expiryKind: "presentation" | "cancellation" | undefined;
   qrExpiresAtMs: number | undefined;
@@ -766,7 +767,9 @@ export class SystemAgentChatEngine {
   /** A QR-owning wizard stays protected until its runner can no longer mutate setup state. */
   hasPendingQrCode(): boolean {
     return Boolean(
-      this.wizardBridge?.step?.qrDataUrl || this.wizardBridge?.session.hasOwnedQrPresentation(),
+      this.wizardBridge?.step?.qrDataUrl ||
+      this.wizardBridge?.session.hasOwnedQrPresentation() ||
+      this.wizardBridge?.cancellationSettlement,
     );
   }
 
@@ -899,7 +902,10 @@ export class SystemAgentChatEngine {
           action: "none",
         });
       }
-      if (bridge.dismissedQrStepId === stepId && bridge.session.hasExternalQrPresentationOwner()) {
+      if (
+        bridge.dismissedQrStepId === stepId &&
+        (bridge.session.hasExternalQrPresentationOwner() || bridge.cancellationSettlement !== null)
+      ) {
         // Observation must stay nonblocking while the dependency-owned runner settles.
         // Waiting here would hold the Gateway-wide system-agent queue behind this poll.
         return this.projectWizardReply({
@@ -1080,7 +1086,9 @@ export class SystemAgentChatEngine {
       : null;
     const wizardInputPending = step ? wizardStepAwaitsInput(step) : false;
     const wizardSettling =
-      bridge !== null && !step && bridge.session.hasExternalQrPresentationOwner();
+      bridge !== null &&
+      !step &&
+      (bridge.session.hasExternalQrPresentationOwner() || bridge.cancellationSettlement !== null);
     return {
       ...projected,
       ...(step?.sensitive === true ? { sensitive: true } : {}),
@@ -1930,6 +1938,7 @@ export class SystemAgentChatEngine {
     const bridge: ActiveWizardBridge = {
       session,
       step: null,
+      cancellationSettlement: null,
       expiryTimer: undefined,
       expiryKind: undefined,
       qrExpiresAtMs: undefined,
@@ -2085,6 +2094,19 @@ export class SystemAgentChatEngine {
       return;
     }
     bridge.session.cancel();
+    // Timer cancellation is not terminal until the dependency runner unwinds. Keep the
+    // bridge protected so a poll cannot publish completion or start replacement work early.
+    const cancellationSettlement = bridge.session.whenSettled();
+    bridge.cancellationSettlement = cancellationSettlement;
+    this.retainPersistentApplySettlement(cancellationSettlement);
+    void cancellationSettlement.then(() => {
+      if (
+        this.wizardBridge === bridge &&
+        bridge.cancellationSettlement === cancellationSettlement
+      ) {
+        bridge.cancellationSettlement = null;
+      }
+    });
     // Keep a scrubbed marker until the next queued turn observes expiry.
     // Otherwise a late Continue becomes unrelated model input.
     bridge.qrExpired = true;
@@ -2114,7 +2136,7 @@ export class SystemAgentChatEngine {
   }
 
   private renderPendingQrOwner(bridge: ActiveWizardBridge): string | null {
-    if (!bridge.session.hasExternalQrPresentationOwner()) {
+    if (!bridge.session.hasExternalQrPresentationOwner() && !bridge.cancellationSettlement) {
       return null;
     }
     return "QR acknowledged. Setup is still finishing this link attempt. Say `cancel` to stop it.";
@@ -2425,7 +2447,7 @@ export class SystemAgentChatEngine {
     }
     this.expireActiveWizardQrIfNeeded();
     if (bridge.qrExpired) {
-      if (bridge.session.hasExternalQrPresentationOwner()) {
+      if (bridge.session.hasExternalQrPresentationOwner() || bridge.cancellationSettlement) {
         return "This setup QR code expired. Setup is still finishing the attempt; choose Continue again shortly.";
       }
       this.clearWizardBridge();
