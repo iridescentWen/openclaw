@@ -12,7 +12,7 @@ vi.mock("../security/install-policy.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../security/install-policy.js")>();
   return {
     ...actual,
-    runInstallPolicy: (...args: unknown[]) => runInstallPolicyMock(...args),
+    runInstallPolicy: runInstallPolicyMock,
   };
 });
 

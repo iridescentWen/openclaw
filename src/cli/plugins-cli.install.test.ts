@@ -2193,7 +2193,7 @@ describe("plugins cli install", () => {
     expect(npmInstallCall().mode).toBe("update");
     expect(npmInstallCall().dangerouslyForceUnsafeInstall).toBe(true);
     expect(
-      runtimeLogs.filter((message) =>
+      pluginsCliRuntimeLogs.filter((message) =>
         message.includes(
           "--dangerously-force-unsafe-install is deprecated and no longer affects plugin installs",
         ),
