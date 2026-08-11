@@ -177,20 +177,6 @@
     ]
   },
   {
-    "name": "countActiveDescendantRuns",
-    "files": [
-      "src/agents/subagents/registry/subagent-registry-read.ts",
-      "src/agents/subagents/registry/subagent-registry.ts"
-    ]
-  },
-  {
-    "name": "countPendingDescendantRuns",
-    "files": [
-      "src/agents/subagents/registry/subagent-registry-announce-read.ts",
-      "src/agents/subagents/registry/subagent-registry.ts"
-    ]
-  },
-  {
     "name": "createCompactionDiagId",
     "files": [
       "src/agents/embedded-agent-runner/compaction-diagnostics.ts",
@@ -306,13 +292,6 @@
     "sdk": true
   },
   {
-    "name": "ensureRecord",
-    "files": [
-      "src/commands/doctor/shared/legacy-config-record-shared.ts",
-      "src/config/legacy.shared.ts"
-    ]
-  },
-  {
     "name": "extractAssistantText",
     "files": [
       "src/agents/embedded-agent-utils.ts",
@@ -417,13 +396,6 @@
     "files": [
       "src/gateway/test-helpers.server.ts",
       "src/test-utils/ports.ts"
-    ]
-  },
-  {
-    "name": "getLatestSubagentRunByChildSessionKey",
-    "files": [
-      "src/agents/subagents/registry/subagent-registry-read.ts",
-      "src/agents/subagents/registry/subagent-registry.ts"
     ]
   },
   {
@@ -568,13 +540,6 @@
     ]
   },
   {
-    "name": "listDescendantRunsForRequester",
-    "files": [
-      "src/agents/subagents/registry/subagent-registry-read.ts",
-      "src/agents/subagents/registry/subagent-registry.ts"
-    ]
-  },
-  {
     "name": "listManagedPluginNpmRoots",
     "files": [
       "src/commands/doctor-plugin-host-links.ts",
@@ -596,13 +561,6 @@
       "src/plugin-sdk/session-store-runtime.ts"
     ],
     "sdk": true
-  },
-  {
-    "name": "listSubagentRunsForController",
-    "files": [
-      "src/agents/subagents/registry/subagent-registry-read.ts",
-      "src/agents/subagents/registry/subagent-registry.ts"
-    ]
   },
   {
     "name": "loadBundledPluginPublicSurface",
@@ -769,13 +727,6 @@
     ]
   },
   {
-    "name": "normalizeSqliteNumber",
-    "files": [
-      "src/config/sessions/session-accessor.sqlite-normalize.ts",
-      "src/infra/sqlite-number.ts"
-    ]
-  },
-  {
     "name": "normalizeStringRecord",
     "files": [
       "src/agents/bundle-mcp-adapter.ts",
@@ -878,14 +829,6 @@
     "files": [
       "src/agents/agent-bundle-mcp-manager-api.ts",
       "src/gateway/server-methods/__mocks__/tools-effective.runtime.ts"
-    ]
-  },
-  {
-    "name": "persistSessionEntry",
-    "files": [
-      "src/agents/command/attempt-execution.shared.ts",
-      "src/agents/command/session-helpers.ts",
-      "src/auto-reply/reply/commands-session-store.ts"
     ]
   },
   {
