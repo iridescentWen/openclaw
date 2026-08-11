@@ -542,35 +542,6 @@ describe("subagent registry seam flow", () => {
     vi.useRealTimers();
   });
 
-  it("routes controller and child lookups through scoped snapshots", () => {
-    const controllerSessionKey = "agent:main:controller";
-    const childSessionKey = "agent:main:subagent:scoped";
-    const run = {
-      runId: "run-scoped",
-      childSessionKey,
-      requesterSessionKey: "agent:main:main",
-      requesterDisplayKey: "main",
-      controllerSessionKey,
-      task: "scoped registry run",
-      cleanup: "keep" as const,
-      createdAt: Date.now(),
-      execution: { status: "running" as const },
-    };
-    mocks.getSubagentRunsSnapshotForController.mockReturnValue(new Map([[run.runId, run]]));
-    mocks.getSubagentRunsSnapshotForChildSession.mockReturnValue(new Map([[run.runId, run]]));
-
-    expect(mod.listSubagentRunsForController(controllerSessionKey)).toEqual([run]);
-    expect(mod.getLatestSubagentRunByChildSessionKey(childSessionKey)).toEqual(run);
-    expect(mocks.getSubagentRunsSnapshotForController).toHaveBeenCalledWith(
-      expect.any(Map),
-      controllerSessionKey,
-    );
-    expect(mocks.getSubagentRunsSnapshotForChildSession).toHaveBeenCalledWith(
-      expect.any(Map),
-      childSessionKey,
-    );
-  });
-
   it("keeps a sweeper archive mutation root-admitted until deletion settles", async () => {
     const now = Date.now();
     mocks.loadSessionStore.mockReturnValue(

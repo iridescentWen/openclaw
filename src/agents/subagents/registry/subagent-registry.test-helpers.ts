@@ -1,4 +1,11 @@
 export * from "./subagent-registry.js";
+export { countPendingDescendantRuns } from "./subagent-registry-announce-read.js";
+export {
+  countActiveDescendantRuns,
+  getLatestSubagentRunByChildSessionKey,
+  listDescendantRunsForRequester,
+  listSubagentRunsForController,
+} from "./subagent-registry-read.js";
 
 import { collectSessionMaintenancePreserveKeys } from "../../../config/sessions/store-maintenance-preserve.js";
 import { normalizeDeliveryContext } from "../../../utils/delivery-context.shared.js";
