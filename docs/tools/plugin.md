@@ -160,6 +160,7 @@ no-op. Plugin
 `before_install` hooks run later, and only in OpenClaw processes where plugin
 hooks are loaded, so use `security.installPolicy` for operator-owned install
 decisions instead. The flag does not override a block or policy failure.
+It also does not bypass `before_install` hook blocks.
 
 See [Skills config](/tools/skills-config#operator-install-policy-securityinstallpolicy)
 for the shared `security.installPolicy` exec schema used by both skills and

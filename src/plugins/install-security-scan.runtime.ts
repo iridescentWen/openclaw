@@ -1000,7 +1000,6 @@ export async function scanInstalledPackageDependencyTreeRuntime(params: {
   const runPolicy = () =>
     runOperatorInstallPolicy({
       config: params.config,
-      dangerouslyForceUnsafeInstall: params.dangerouslyForceUnsafeInstall,
       logger: params.logger,
       onInstallPolicyWarning: params.onInstallPolicyWarning,
       origin: { type: "plugin-dependency-tree" },
