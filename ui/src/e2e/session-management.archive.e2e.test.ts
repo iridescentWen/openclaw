@@ -505,7 +505,7 @@ suite.define(() => {
     try {
       await page.goto(controlUiSessionUrl(suite.server.baseUrl, deletedKey));
       await page
-        .locator(".agent-chat__input textarea")
+        .locator('openclaw-chat-pane[aria-hidden="false"] .agent-chat__input textarea')
         .waitFor({ state: "visible", timeout: 10_000 });
 
       const requestsBeforeDeletion = (await gateway.getRequests("sessions.list")).length;
@@ -520,7 +520,7 @@ suite.define(() => {
         .poll(() => new URL(page.url()).pathname, { timeout: 15_000 })
         .toBe(controlUiSessionPath(mainKey));
       await page
-        .locator(".agent-chat__input textarea")
+        .locator('openclaw-chat-pane[aria-hidden="false"] .agent-chat__input textarea')
         .waitFor({ state: "visible", timeout: 10_000 });
       await expect
         .poll(async () => (await gateway.getRequests("sessions.list")).length)
