@@ -534,6 +534,8 @@ enum class GatewayMethod(
   ProjectsRegister("projects.register"),
   ProjectsRemove("projects.remove"),
   WorkerDesktopLaunch("worker.desktop.launch"),
+  DeviceScopesRequestUpgrade("device.scopes.requestUpgrade"),
+  DeviceScopesWaitUpgrade("device.scopes.waitUpgrade"),
 }
 
 enum class GatewayEvent(
