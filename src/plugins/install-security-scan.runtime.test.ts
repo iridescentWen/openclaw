@@ -3,7 +3,9 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAutoCleanupTempDirTracker } from "../../test/helpers/temp-dir.js";
 
-const runInstallPolicyMock = vi.fn();
+type RunInstallPolicy = typeof import("../security/install-policy.js").runInstallPolicy;
+
+const runInstallPolicyMock = vi.fn<RunInstallPolicy>();
 const getGlobalHookRunnerMock = vi.fn();
 
 vi.mock("../security/install-policy.js", async (importOriginal) => {
@@ -326,10 +328,18 @@ describe("legacy file install scan compatibility", () => {
     const onInstallPolicyWarning = vi.fn().mockResolvedValue({ status: "approved" });
     runInstallPolicyMock
       .mockResolvedValueOnce({
-        warning: { reason: "review this plugin", fingerprint: "warning-a" },
+        warning: {
+          reason: "review this plugin",
+          fingerprint: "warning-a",
+          approvalFingerprint: "approval-a",
+        },
       })
       .mockResolvedValueOnce({
-        warning: { reason: "review this plugin", fingerprint: "warning-a" },
+        warning: {
+          reason: "review this plugin",
+          fingerprint: "warning-a",
+          approvalFingerprint: "approval-a",
+        },
       });
 
     const result = await scanFileInstallSourceRuntime({
@@ -344,7 +354,7 @@ describe("legacy file install scan compatibility", () => {
       targetName: "payload",
       targetType: "plugin",
       requestMode: "install",
-      warningFingerprint: "warning-a",
+      approvalFingerprint: "approval-a",
       scan: {
         requestKind: "plugin-file",
         originType: "plugin-file",
@@ -365,10 +375,18 @@ describe("legacy file install scan compatibility", () => {
     const onInstallPolicyWarning = vi.fn().mockResolvedValue({ status: "approved" });
     runInstallPolicyMock
       .mockResolvedValueOnce({
-        warning: { reason: "review this plugin", fingerprint: "warning-a" },
+        warning: {
+          reason: "review this plugin",
+          fingerprint: "warning-a",
+          approvalFingerprint: "approval-a",
+        },
       })
       .mockResolvedValueOnce({
-        warning: { reason: "review the new finding", fingerprint: "warning-b" },
+        warning: {
+          reason: "review the new finding",
+          fingerprint: "warning-b",
+          approvalFingerprint: "approval-a",
+        },
         findings: [
           {
             ruleId: "changed-warning",
@@ -406,7 +424,7 @@ describe("legacy file install scan compatibility", () => {
             },
           ],
         },
-        warningFingerprint: "warning-b",
+        approvalFingerprint: "approval-a",
       },
     });
     expect(result?.blocked?.reason).toContain("Reason: review the new finding");
@@ -419,7 +437,11 @@ describe("legacy file install scan compatibility", () => {
   it("renders metadata changes that require approval again", async () => {
     const onInstallPolicyWarning = vi.fn().mockResolvedValue({ status: "approved" });
     const initialWarning = {
-      warning: { reason: "same bounded reason", fingerprint: "full-warning-a" },
+      warning: {
+        reason: "same bounded reason",
+        fingerprint: "full-warning-a",
+        approvalFingerprint: "approval-a",
+      },
       findings: [
         {
           ruleId: "initial-rule",
@@ -430,7 +452,11 @@ describe("legacy file install scan compatibility", () => {
       ],
     };
     runInstallPolicyMock.mockResolvedValueOnce(initialWarning).mockResolvedValueOnce({
-      warning: { ...initialWarning.warning, fingerprint: "full-warning-b" },
+      warning: {
+        ...initialWarning.warning,
+        fingerprint: "full-warning-b",
+        approvalFingerprint: "approval-b",
+      },
       findings: [
         {
           ruleId: "refreshed-rule",
@@ -455,7 +481,7 @@ describe("legacy file install scan compatibility", () => {
     );
     expect(result?.blocked?.reason).not.toContain("initial-rule");
     expect(result?.blocked?.reason).not.toContain("initial evidence");
-    expect(result?.blocked?.installPolicyWarning?.warningFingerprint).toBe("full-warning-b");
+    expect(result?.blocked?.installPolicyWarning?.approvalFingerprint).toBe("approval-b");
     expect(onInstallPolicyWarning).toHaveBeenCalledTimes(1);
     expect(runInstallPolicyMock).toHaveBeenCalledTimes(2);
   });
@@ -463,7 +489,11 @@ describe("legacy file install scan compatibility", () => {
   it("keeps a block from policy re-evaluation terminal", async () => {
     runInstallPolicyMock
       .mockResolvedValueOnce({
-        warning: { reason: "review this plugin", fingerprint: "warning-a" },
+        warning: {
+          reason: "review this plugin",
+          fingerprint: "warning-a",
+          approvalFingerprint: "approval-a",
+        },
       })
       .mockResolvedValueOnce({
         blocked: { code: "security_scan_blocked", reason: "now blocked" },
@@ -481,7 +511,11 @@ describe("legacy file install scan compatibility", () => {
 
   it("keeps the deprecated unsafe flag inert when policy warns", async () => {
     runInstallPolicyMock.mockResolvedValue({
-      warning: { reason: "review this plugin", fingerprint: "warning-a" },
+      warning: {
+        reason: "review this plugin",
+        fingerprint: "warning-a",
+        approvalFingerprint: "approval-a",
+      },
     });
 
     const result = await scanFileInstallSourceRuntime({
@@ -505,7 +539,7 @@ describe("legacy file install scan compatibility", () => {
           requestMode: "install",
           reason: "review this plugin",
         },
-        warningFingerprint: "warning-a",
+        approvalFingerprint: "approval-a",
       },
       reason: expectedInstallPolicyNotice({
         decision: "warn",
@@ -525,7 +559,11 @@ describe("legacy file install scan compatibility", () => {
   it("keeps a block from acknowledged policy re-evaluation terminal", async () => {
     runInstallPolicyMock
       .mockResolvedValueOnce({
-        warning: { reason: "review this plugin", fingerprint: "warning-a" },
+        warning: {
+          reason: "review this plugin",
+          fingerprint: "warning-a",
+          approvalFingerprint: "approval-a",
+        },
       })
       .mockResolvedValueOnce({
         blocked: { code: "security_scan_blocked", reason: "now blocked" },
@@ -544,7 +582,11 @@ describe("legacy file install scan compatibility", () => {
 
   it("distinguishes an exhausted noninteractive approval from cancellation", async () => {
     runInstallPolicyMock.mockResolvedValue({
-      warning: { reason: "review the dependency warning", fingerprint: "warning-a" },
+      warning: {
+        reason: "review the dependency warning",
+        fingerprint: "warning-a",
+        approvalFingerprint: "approval-a",
+      },
       findings: [
         {
           ruleId: "dependency-warning",
@@ -581,7 +623,7 @@ describe("legacy file install scan compatibility", () => {
         requestMode: "install",
         reason: "review the dependency warning",
       },
-      warningFingerprint: "warning-a",
+      approvalFingerprint: "approval-a",
     });
     expect(runInstallPolicyMock).toHaveBeenCalledTimes(1);
   });
@@ -589,7 +631,11 @@ describe("legacy file install scan compatibility", () => {
   it("renders warning details as one readable review notice", async () => {
     const warnings: string[] = [];
     runInstallPolicyMock.mockResolvedValue({
-      warning: { reason: "review this plugin", fingerprint: "warning-a" },
+      warning: {
+        reason: "review this plugin",
+        fingerprint: "warning-a",
+        approvalFingerprint: "approval-a",
+      },
       findings: [{ ruleId: "context", severity: "info", message: "Informational context." }],
     });
 
@@ -613,7 +659,7 @@ describe("legacy file install scan compatibility", () => {
         reason: "review this plugin",
         findings: [{ ruleId: "context", severity: "info", message: "Informational context." }],
       },
-      warningFingerprint: "warning-a",
+      approvalFingerprint: "approval-a",
     });
     expect(warnings).toEqual([
       `${expectedInstallPolicyNotice({

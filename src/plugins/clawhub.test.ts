@@ -1784,6 +1784,15 @@ describe("installPluginFromClawHub", () => {
     expect(archiveInstallCall().onInstallPolicyWarning).toBe(onInstallPolicyWarning);
   });
 
+  it("preserves the reviewed policy spec when retrying a pinned ClawHub version", async () => {
+    await installPluginFromClawHub({
+      spec: "clawhub:demo@2026.3.22",
+      installPolicyRequestedSpecifier: "clawhub:demo",
+    });
+
+    expect(archiveInstallCall().installPolicyRequest?.requestedSpecifier).toBe("clawhub:demo");
+  });
+
   it("cleans up the downloaded archive even when archive install fails", async () => {
     installPluginFromArchiveMock.mockResolvedValueOnce({
       ok: false,

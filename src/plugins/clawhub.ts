@@ -1218,6 +1218,7 @@ export async function installPluginFromClawHub(
     dryRun?: boolean;
     expectedPluginId?: string;
     expectedIntegrity?: string;
+    installPolicyRequestedSpecifier?: string;
     env?: RuntimeVersionEnv;
     acknowledgeClawHubRisk?: boolean;
     onClawHubRisk?: (request: ClawHubRiskAcknowledgementRequest) => boolean | Promise<boolean>;
@@ -1457,7 +1458,7 @@ export async function installPluginFromClawHub(
       expectedPluginId: runtimeIdResolution.expectedPluginId,
       installPolicyRequest: {
         kind: "plugin-archive",
-        requestedSpecifier: params.spec,
+        requestedSpecifier: params.installPolicyRequestedSpecifier ?? params.spec,
         source: {
           kind: "clawhub",
           authority: officialClawHubPackage ? "official" : clawhubAuthority,

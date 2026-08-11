@@ -21,7 +21,7 @@ type InstallPolicyWarningScanIdentity = {
 export type InstallPolicyWarningOccurrence = {
   scan: InstallPolicyWarningScanIdentity;
   warning: InstallPolicyWarningDetails;
-  warningFingerprint: string;
+  approvalFingerprint: string;
 };
 
 export type InstallPolicyWarningAcknowledgementRequest = InstallPolicyWarningOccurrence & {
@@ -30,7 +30,7 @@ export type InstallPolicyWarningAcknowledgementRequest = InstallPolicyWarningOcc
   requestMode: "install" | "update";
 };
 
-type InstallPolicyWarningAcknowledgementResult =
+export type InstallPolicyWarningAcknowledgementResult =
   | { status: "approved" }
   | { status: "declined" }
   | {

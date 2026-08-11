@@ -50,7 +50,7 @@ function warningOccurrence(
   warning: InstallPolicyWarningDetails,
   scan: InstallPolicyWarningScanIdentity = packageScan,
 ): InstallPolicyWarningOccurrence {
-  return { scan, warning, warningFingerprint: `fingerprint:${warning.reason}` };
+  return { scan, warning, approvalFingerprint: `fingerprint:${warning.reason}` };
 }
 
 async function callHandler(
@@ -435,7 +435,7 @@ describe("plugin management Gateway handlers", () => {
           warnings: [
             {
               scan: packageScan,
-              warningFingerprint: "fingerprint:Scanner found behavior that needs review",
+              approvalFingerprint: "fingerprint:Scanner found behavior that needs review",
               warning: {
                 targetName: "demo-plugin",
                 targetType: "plugin",
@@ -485,7 +485,7 @@ describe("plugin management Gateway handlers", () => {
           warnings: [
             {
               scan: packageScan,
-              warningFingerprint: "fingerprint:Scanner found a different issue",
+              approvalFingerprint: "fingerprint:Scanner found a different issue",
               warning: {
                 targetName: "demo-plugin",
                 targetType: "plugin",
@@ -591,7 +591,7 @@ describe("plugin management Gateway handlers", () => {
       "scan",
     );
     expect((first.error as { details?: Record<string, unknown> }).details).not.toHaveProperty(
-      "warningFingerprint",
+      "approvalFingerprint",
     );
 
     managementMocks.install.mockRejectedValueOnce(
@@ -616,7 +616,7 @@ describe("plugin management Gateway handlers", () => {
       "scan",
     );
     expect((second.error as { details?: Record<string, unknown> }).details).not.toHaveProperty(
-      "warningFingerprint",
+      "approvalFingerprint",
     );
 
     managementMocks.install.mockResolvedValueOnce({

@@ -207,7 +207,7 @@ describe("plugin management install-policy acknowledgements", () => {
     await expectOneShotInstallPolicyWarningAcknowledgement(mocks.clawhubInstall);
   });
 
-  it("acknowledges a reviewed warning only at the same scan stage and only once", async () => {
+  it("acknowledges the same warning only for the same target and scan stage once", async () => {
     mocks.readConfig.mockResolvedValue(configSnapshot());
     mockHostedOfficialCatalog([hostedFeedDiffsEntry]);
     mockClawHubInstall("diffs", "@openclaw/diffs");
@@ -220,7 +220,7 @@ describe("plugin management install-policy acknowledgements", () => {
       "first approved warning",
     );
     const dependencyWarning: InstallPolicyWarningOccurrence = {
-      warningFingerprint: packageWarning.warningFingerprint,
+      approvalFingerprint: packageWarning.approvalFingerprint,
       scan: {
         ...packageWarning.scan,
         originType: "plugin-dependency-tree",
@@ -230,7 +230,18 @@ describe("plugin management install-policy acknowledgements", () => {
     };
     const changedFingerprintWarning: InstallPolicyWarningOccurrence = {
       ...packageWarning,
-      warningFingerprint: "changed-full-warning",
+      approvalFingerprint: "changed-warning-approval",
+    };
+    const wrongTargetWarning: InstallPolicyWarningOccurrence = {
+      ...packageWarning,
+      warning: { ...packageWarning.warning, targetName: "other-plugin" },
+    };
+    const restagedPackageWarning: InstallPolicyWarningOccurrence = {
+      ...packageWarning,
+      warning: {
+        ...packageWarning.warning,
+        reason: "Review this warning in /tmp/openclaw-stage-b",
+      },
     };
 
     await installManagedPlugin({
@@ -269,11 +280,19 @@ describe("plugin management install-policy acknowledgements", () => {
         ...dependencyWarning,
       }),
     ).toEqual({ status: "unavailable", reason: "warning-not-approved" });
+    expect(
+      await acknowledge({
+        targetName: wrongTargetWarning.warning.targetName,
+        targetType: wrongTargetWarning.warning.targetType,
+        requestMode: wrongTargetWarning.warning.requestMode,
+        ...wrongTargetWarning,
+      }),
+    ).toEqual({ status: "unavailable", reason: "warning-not-approved" });
     const packageRequest: InstallPolicyWarningAcknowledgementRequest = {
-      targetName: packageWarning.warning.targetName,
-      targetType: packageWarning.warning.targetType,
-      requestMode: packageWarning.warning.requestMode,
-      ...packageWarning,
+      targetName: restagedPackageWarning.warning.targetName,
+      targetType: restagedPackageWarning.warning.targetType,
+      requestMode: restagedPackageWarning.warning.requestMode,
+      ...restagedPackageWarning,
     };
     expect(await acknowledge(packageRequest)).toEqual({ status: "approved" });
     expect(await acknowledge(packageRequest)).toEqual({
@@ -284,7 +303,7 @@ describe("plugin management install-policy acknowledgements", () => {
 
   it("pins reviewed npm warnings to the first resolved version and integrity", async () => {
     const warning: InstallPolicyWarningOccurrence = {
-      warningFingerprint: "review-npm-package",
+      approvalFingerprint: "review-npm-package",
       scan: {
         requestKind: "plugin-npm",
         originType: "plugin-npm",
@@ -343,6 +362,7 @@ describe("plugin management install-policy acknowledgements", () => {
     expect(resolvedRequest).toMatchObject({
       source: "official",
       spec: npmResolution.resolvedSpec,
+      installPolicyRequestedSpecifier: "@openclaw/npm-demo",
       expectedIntegrity: npmResolution.integrity,
     });
 
@@ -362,6 +382,7 @@ describe("plugin management install-policy acknowledgements", () => {
     expect(mocks.npmInstall).toHaveBeenLastCalledWith(
       expect.objectContaining({
         spec: npmResolution.resolvedSpec,
+        installPolicyRequestedSpecifier: "@openclaw/npm-demo",
         expectedIntegrity: npmResolution.integrity,
       }),
     );
@@ -369,7 +390,7 @@ describe("plugin management install-policy acknowledgements", () => {
 
   it("keeps npm warnings terminal when immutable resolution metadata is incomplete", async () => {
     const warning: InstallPolicyWarningOccurrence = {
-      warningFingerprint: "review-npm-package",
+      approvalFingerprint: "review-npm-package",
       scan: {
         requestKind: "plugin-npm",
         originType: "plugin-npm",
@@ -424,7 +445,7 @@ describe("plugin management install-policy acknowledgements", () => {
 
   it("pins reviewed ClawHub warnings to the downloaded archive integrity", async () => {
     const warning: InstallPolicyWarningOccurrence = {
-      warningFingerprint: "review-clawhub-package",
+      approvalFingerprint: "review-clawhub-package",
       scan: {
         requestKind: "plugin-archive",
         originType: "plugin-package",
@@ -462,6 +483,7 @@ describe("plugin management install-policy acknowledgements", () => {
     expect(failure.installPolicyResolvedRequest).toMatchObject({
       source: "clawhub",
       spec: "clawhub:community/demo@1.2.3",
+      installPolicyRequestedSpecifier: "clawhub:community/demo",
       expectedIntegrity: "sha256-reviewed",
     });
   });

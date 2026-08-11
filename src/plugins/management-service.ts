@@ -156,6 +156,7 @@ export type ManagedPluginSourceInstallRequest =
   | {
       source: "clawhub";
       spec: string;
+      installPolicyRequestedSpecifier?: string;
       mode?: "install" | "update";
       expectedPluginId?: string;
       expectedIntegrity?: string;
@@ -171,6 +172,7 @@ export type ManagedPluginSourceInstallRequest =
   | {
       source: "official";
       spec: string;
+      installPolicyRequestedSpecifier?: string;
       pluginId: string;
       expectedIntegrity?: string;
       mode: "install" | "update";
@@ -179,6 +181,7 @@ export type ManagedPluginSourceInstallRequest =
   | {
       source: "npm";
       spec: string;
+      installPolicyRequestedSpecifier?: string;
       mode: "install" | "update";
       pin?: boolean;
       expectedPluginId?: string;
@@ -1020,6 +1023,7 @@ function pinInstallPolicyResolvedRequest(
     return {
       ...request,
       spec: npmResolution.resolvedSpec,
+      installPolicyRequestedSpecifier: request.installPolicyRequestedSpecifier ?? request.spec,
       expectedIntegrity: npmResolution.integrity,
     };
   }
@@ -1034,6 +1038,7 @@ function pinInstallPolicyResolvedRequest(
     ? {
         ...request,
         spec: buildClawHubSpec(parsed.name, version),
+        installPolicyRequestedSpecifier: request.installPolicyRequestedSpecifier ?? request.spec,
         expectedIntegrity: integrity,
       }
     : undefined;
@@ -1378,6 +1383,9 @@ export async function installManagedPluginSource(params: {
       installPluginFromClawHub({
         ...common,
         spec: request.spec,
+        ...(request.installPolicyRequestedSpecifier
+          ? { installPolicyRequestedSpecifier: request.installPolicyRequestedSpecifier }
+          : {}),
         mode: request.mode,
         ...(request.expectedPluginId ? { expectedPluginId: request.expectedPluginId } : {}),
         ...(request.expectedIntegrity ? { expectedIntegrity: request.expectedIntegrity } : {}),
@@ -1401,6 +1409,9 @@ export async function installManagedPluginSource(params: {
     installPluginFromNpmSpec({
       ...common,
       spec: request.spec,
+      ...(request.installPolicyRequestedSpecifier
+        ? { installPolicyRequestedSpecifier: request.installPolicyRequestedSpecifier }
+        : {}),
       mode: request.mode,
       ...(request.source === "official" || request.trustedSourceLinkedOfficialInstall
         ? { trustedSourceLinkedOfficialInstall: true }
@@ -1533,10 +1544,20 @@ export async function installManagedPlugin(params: {
       ...(params.request.installPolicyWarningAcknowledgement
         ? {
             safetyOverrides: {
-              onInstallPolicyWarning: async ({ scan, warning, warningFingerprint }) => {
-                const currentWarning = { scan, warning, warningFingerprint };
-                const warningIndex = remainingInstallPolicyWarnings.findIndex((approved) =>
-                  isDeepStrictEqual(currentWarning, approved),
+              onInstallPolicyWarning: async ({
+                scan,
+                approvalFingerprint,
+                targetName,
+                targetType,
+                requestMode,
+              }) => {
+                const warningIndex = remainingInstallPolicyWarnings.findIndex(
+                  (approved) =>
+                    approved.approvalFingerprint === approvalFingerprint &&
+                    isDeepStrictEqual(approved.scan, scan) &&
+                    approved.warning.targetName === targetName &&
+                    approved.warning.targetType === targetType &&
+                    approved.warning.requestMode === requestMode,
                 );
                 if (warningIndex < 0) {
                   return { status: "unavailable", reason: "warning-not-approved" };

@@ -48,7 +48,7 @@ describe("resolveInstallPolicyWarningAcknowledgementCliOptions", () => {
         targetName: "demo\npkg",
         targetType: "plugin",
         requestMode: fixture.requestMode,
-        warningFingerprint: "review-required",
+        approvalFingerprint: "review-required",
         scan: {
           requestKind: "plugin-npm",
           originType: "plugin-npm",
@@ -79,7 +79,7 @@ describe("resolveInstallPolicyWarningAcknowledgementCliOptions", () => {
         targetName: "demo",
         targetType: "skill",
         requestMode: "install",
-        warningFingerprint: "review-required",
+        approvalFingerprint: "review-required",
         scan: {
           requestKind: "skill-install",
           originType: "skill-managed-install",
@@ -127,7 +127,7 @@ describe("resolveInstallPolicyWarningAcknowledgementCliOptions", () => {
       targetName: "demo",
       targetType: "plugin",
       requestMode: "install",
-      warningFingerprint: "review-required",
+      approvalFingerprint: "review-required",
       scan: {
         requestKind: "plugin-npm",
         originType: "plugin-npm",

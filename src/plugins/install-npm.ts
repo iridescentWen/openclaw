@@ -56,6 +56,7 @@ export async function installPluginFromNpmSpec(
     expectedPluginId?: string;
     expectedReplacementPluginId?: string;
     expectedIntegrity?: string;
+    installPolicyRequestedSpecifier?: string;
     onIntegrityDrift?: (params: PluginNpmIntegrityDriftParams) => boolean | Promise<boolean>;
   },
 ): Promise<InstallPluginResult> {
@@ -66,6 +67,7 @@ export async function installPluginFromNpmSpec(
   );
   const expectedPluginId = params.expectedPluginId;
   const spec = params.spec.trim();
+  const installPolicyRequestedSpecifier = params.installPolicyRequestedSpecifier?.trim() || spec;
   const specError = runtime.validateRegistryNpmSpec(spec);
   if (specError) {
     return {
@@ -211,14 +213,16 @@ export async function installPluginFromNpmSpec(
 
   const policyTempDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-npm-policy-"));
   try {
+    const policyNpmResolution = { ...npmResolution };
+    delete policyNpmResolution.resolvedAt;
     const policyMetadataPath = path.join(policyTempDir, "npm-package-metadata.json");
     await fs.writeFile(
       policyMetadataPath,
       `${JSON.stringify(
         {
           packageName: parsedSpec.name,
-          requestedSpecifier: spec,
-          resolution: npmResolution,
+          requestedSpecifier: installPolicyRequestedSpecifier,
+          resolution: policyNpmResolution,
         },
         null,
         2,
@@ -239,7 +243,7 @@ export async function installPluginFromNpmSpec(
           mode: policyMode,
           packageName: parsedSpec.name,
           ...(expectedPluginId ? { pluginId: expectedPluginId } : {}),
-          requestedSpecifier: spec,
+          requestedSpecifier: installPolicyRequestedSpecifier,
           source: npmInstallPolicySource,
           sourcePath: policyMetadataPath,
           sourcePathKind: "file",
@@ -265,7 +269,7 @@ export async function installPluginFromNpmSpec(
     displaySpec: spec,
     installPolicyRequest: {
       kind: "plugin-npm",
-      requestedSpecifier: spec,
+      requestedSpecifier: installPolicyRequestedSpecifier,
       source: npmInstallPolicySource,
     },
     extensionsDir: params.extensionsDir,

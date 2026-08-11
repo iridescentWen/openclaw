@@ -7,7 +7,7 @@ import type {
 } from "../install-security-scan.types.js";
 
 const officialDiffsWarningOccurrence: InstallPolicyWarningOccurrence = {
-  warningFingerprint: "review-diffs-warning",
+  approvalFingerprint: "review-diffs-warning",
   scan: {
     requestKind: "plugin-archive",
     originType: "plugin-package",
