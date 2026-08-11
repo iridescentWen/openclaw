@@ -258,7 +258,8 @@ export function readPluginSdkSurfaceBudgets(env: NodeJS.ProcessEnv = process.env
       // -2: remove unused WhatsApp-specific ack policy exports from channel-feedback.
       // -7: retire unused and duplicate inbound-dispatch compatibility exports.
       // +7: restore still-existing deprecated inbound-dispatch compatibility re-exports.
-      4857,
+      // +1: QQBot 2.0.1 operator-approval Gateway client compatibility export.
+      4858,
       env,
     ),
     publicFunctionExports: readPluginSdkSurfaceBudgetEnv(
@@ -317,7 +318,8 @@ export function readPluginSdkSurfaceBudgets(env: NodeJS.ProcessEnv = process.env
       // -10: collapse inbound-dispatch callable aliases and wrappers.
       // +7: restore still-existing deprecated inbound-dispatch callable re-exports.
       // -3: keep the generic plugin-command reply carrier opaque and non-callable.
-      2919,
+      // +1: QQBot 2.0.1 operator-approval Gateway client compatibility export.
+      2920,
       env,
     ),
     publicDeprecatedExports: readPluginSdkSurfaceBudgetEnv(
