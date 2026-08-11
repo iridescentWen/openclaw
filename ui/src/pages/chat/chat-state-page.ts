@@ -1,6 +1,10 @@
 import type { GatewayBrowserClient } from "../../api/gateway.ts";
 import type { AgentsListResult } from "../../api/types.ts";
 import { fetchAssistantIdentity } from "../../app/assistant-identity.ts";
+import {
+  dispatchCommandClientPresentation,
+  type CommandClientPresentationAction,
+} from "../../app/command-client-presentation.ts";
 import type { ApplicationContext } from "../../app/context.ts";
 import { loadLocalUserIdentity, loadSettings, patchSettings } from "../../app/settings.ts";
 import { t } from "../../i18n/index.ts";
@@ -216,6 +220,8 @@ export function createPageState(
     chatSendingScopeKey: null,
     chatMessagesBySession,
     eventLogBuffer: [],
+    dispatchClientPresentation: (action: CommandClientPresentationAction) =>
+      dispatchCommandClientPresentation(context, action),
     basePath: context.basePath,
     chatNewMessagesBelow: false,
     chatLocalInputHistoryBySession: {},
