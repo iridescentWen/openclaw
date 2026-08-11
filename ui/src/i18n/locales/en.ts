@@ -3587,6 +3587,8 @@ export const en: TranslationMap = {
     retryNow: "Retry now",
     scopeUpgrade: {
       limited: "This browser has limited access.",
+      guidance:
+        "This browser has limited access. Manage it with openclaw devices on the Gateway or from Devices on an admin browser.",
       request: "Request admin",
       requesting: "Requesting administrator access…",
       requestingAction: "Requesting…",
