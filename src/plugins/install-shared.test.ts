@@ -17,6 +17,7 @@ describe("installPluginDirectoryIntoExtensions", () => {
     fs.mkdirSync(sourceDir, { recursive: true });
     fs.writeFileSync(path.join(sourceDir, "index.js"), "export default {};\n");
     const installPolicyWarning = {
+      warningFingerprint: "review-installed-dependency-tree",
       scan: {
         requestKind: "plugin-archive" as const,
         originType: "plugin-dependency-tree",
