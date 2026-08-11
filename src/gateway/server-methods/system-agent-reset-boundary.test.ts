@@ -10,7 +10,11 @@ import { closeOpenClawStateDatabase } from "../../state/openclaw-state-db.js";
 import { SystemAgentChatEngine } from "../../system-agent/chat-engine.js";
 import { SystemAgentInferenceUnavailableError } from "../../system-agent/inference-error.js";
 import { createSystemAgentVerifiedInferenceTestFixture } from "../../system-agent/system-agent.test-helpers.js";
-import { appendTranscriptTurn, readTranscriptTail } from "../../system-agent/transcript-store.js";
+import {
+  appendTranscriptReset,
+  appendTranscriptTurn,
+  readTranscriptTail,
+} from "../../system-agent/transcript-store.js";
 import { withTempDir } from "../../test-helpers/temp-dir.js";
 import { systemAgentHandlers, type SystemAgentChatSession } from "./system-agent.js";
 import type { GatewayClient, GatewayRequestContext } from "./types.js";
@@ -135,6 +139,19 @@ async function withTranscriptState(prefix: string, run: () => Promise<void>): Pr
 describe("openclaw.chat reset boundary", () => {
   it("persists session attribution through the scoped recovery handler", async () => {
     await withTranscriptState("openclaw-session-recovery-boundary-", async () => {
+      appendTranscriptTurn({
+        role: "user",
+        text: "discarded setup request",
+        at: 1,
+        sessionId: "recover-session",
+      });
+      appendTranscriptTurn({
+        role: "assistant",
+        text: "discarded setup reply",
+        at: 2,
+        sessionId: "recover-session",
+      });
+      appendTranscriptReset();
       const fixture = await createSystemAgentVerifiedInferenceTestFixture(verifiedConfig);
       const engine = new SystemAgentChatEngine({
         surface: "gateway",
