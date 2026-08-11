@@ -33,15 +33,19 @@ export const WORKER_PROTOCOL_METHODS = [
   "worker.heartbeat",
   "worker.transcript.commit",
   "worker.live-event",
+  "worker.sessions.spawn",
+  "worker.sessions.send",
 ] as const;
 export const WORKER_TRANSCRIPT_COMMIT_PROTOCOL_FEATURE = "worker-transcript-commit-v1";
 export const WORKER_LIVE_EVENT_PROTOCOL_FEATURE = "worker-live-event-v1";
 export const WORKER_LAUNCH_V2_PROTOCOL_FEATURE = "worker-launch-v2";
+export const WORKER_SESSION_TOOLS_PROTOCOL_FEATURE = "worker-session-tools-v1";
 export const WORKER_PROTOCOL_FEATURES = [
   "worker-heartbeat-v1",
   WORKER_TRANSCRIPT_COMMIT_PROTOCOL_FEATURE,
   WORKER_LIVE_EVENT_PROTOCOL_FEATURE,
   WORKER_LAUNCH_V2_PROTOCOL_FEATURE,
+  WORKER_SESSION_TOOLS_PROTOCOL_FEATURE,
   "worker-inference-v1",
 ] as const;
 export const WORKER_PROTOCOL_MAX_METHOD_LENGTH = 64;
@@ -183,6 +187,48 @@ const WorkerHeartbeatSuccessResponseFrameSchema = closedObject({
 
 export const WorkerHeartbeatResponseFrameSchema = Type.Union([
   WorkerHeartbeatSuccessResponseFrameSchema,
+  WorkerErrorResponseFrameSchema,
+]);
+
+const WorkerSessionToolCallIdSchema = Type.String({ minLength: 1, maxLength: 256 });
+
+export const WorkerSessionsSpawnParamsSchema = closedObject({
+  toolCallId: WorkerSessionToolCallIdSchema,
+  task: Type.String({ minLength: 1, maxLength: WORKER_PROTOCOL_MAX_PAYLOAD_BYTES }),
+  label: Type.Optional(Type.String({ minLength: 1, maxLength: 256 })),
+  agentId: Type.Optional(WorkerIdentifierSchema),
+  model: Type.Optional(Type.String({ minLength: 1, maxLength: 256 })),
+  runTimeoutSeconds: Type.Optional(Type.Integer({ minimum: 0, maximum: 86_400 })),
+});
+
+export const WorkerSessionsSendParamsSchema = closedObject({
+  toolCallId: WorkerSessionToolCallIdSchema,
+  sessionKey: Type.String({ minLength: 1, maxLength: 1_024 }),
+  message: Type.String({ minLength: 1, maxLength: WORKER_PROTOCOL_MAX_PAYLOAD_BYTES }),
+  timeoutSeconds: Type.Optional(Type.Integer({ minimum: 0, maximum: 86_400 })),
+});
+
+export const WorkerSessionToolResultSchema = closedObject({
+  resultJson: Type.String({ minLength: 2, maxLength: WORKER_PROTOCOL_MAX_PAYLOAD_BYTES }),
+});
+
+export const WorkerSessionsSpawnResponseFrameSchema = Type.Union([
+  closedObject({
+    type: Type.Literal("res"),
+    id: WorkerFrameIdSchema,
+    ok: Type.Literal(true),
+    payload: WorkerSessionToolResultSchema,
+  }),
+  WorkerErrorResponseFrameSchema,
+]);
+
+export const WorkerSessionsSendResponseFrameSchema = Type.Union([
+  closedObject({
+    type: Type.Literal("res"),
+    id: WorkerFrameIdSchema,
+    ok: Type.Literal(true),
+    payload: WorkerSessionToolResultSchema,
+  }),
   WorkerErrorResponseFrameSchema,
 ]);
 
@@ -647,6 +693,13 @@ export type WorkerHeartbeatParams = Static<typeof WorkerHeartbeatParamsSchema>;
 export type WorkerHeartbeatResult = Static<typeof WorkerHeartbeatResultSchema>;
 export type WorkerHeartbeatRequestFrame = Static<typeof WorkerHeartbeatRequestFrameSchema>;
 export type WorkerHeartbeatResponseFrame = Static<typeof WorkerHeartbeatResponseFrameSchema>;
+export type WorkerSessionsSpawnParams = Static<typeof WorkerSessionsSpawnParamsSchema>;
+export type WorkerSessionsSendParams = Static<typeof WorkerSessionsSendParamsSchema>;
+export type WorkerSessionToolResult = Static<typeof WorkerSessionToolResultSchema>;
+export type WorkerSessionsSpawnResponseFrame = Static<
+  typeof WorkerSessionsSpawnResponseFrameSchema
+>;
+export type WorkerSessionsSendResponseFrame = Static<typeof WorkerSessionsSendResponseFrameSchema>;
 export type WorkerTranscriptMessage = Static<typeof WorkerTranscriptMessageSchema>;
 export type WorkerProviderReplayState = Static<typeof WorkerProviderReplayStateSchema>;
 export type WorkerTranscriptCommitParams = Static<typeof WorkerTranscriptCommitParamsSchema>;

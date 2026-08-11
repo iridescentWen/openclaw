@@ -32,7 +32,12 @@ import {
   canTransitionWorkerSessionPlacement,
   type WorkerSessionPlacementState,
 } from "./placement-state.js";
-import { createPlacementTurnClaimOps, signalTurnClaimRelease } from "./placement-turn-claims.js";
+import {
+  assertNoRunningWorkerSessionToolOperations,
+  clearWorkerTurnToolState,
+  createPlacementTurnClaimOps,
+  signalTurnClaimRelease,
+} from "./placement-turn-claims.js";
 import {
   clearWorkerWorkspaceReconciliation,
   createPlacementWorkspaceJournalOps,
@@ -420,6 +425,16 @@ export function createWorkerSessionPlacementStore(
         // Clear the last claim in the same CAS that opens post-worker
         // reconciliation. Pending results block this authority fence.
         const releasedClaim = current.turnClaim !== null;
+        if (current.turnClaim) {
+          assertNoRunningWorkerSessionToolOperations(db, {
+            sessionId,
+            claimId: current.turnClaim.claimId,
+          });
+          clearWorkerTurnToolState(db, {
+            sessionId,
+            claimId: current.turnClaim.claimId,
+          });
+        }
         const values = transitionValues(current, "reconciling", {}, now());
         const update = query(db)
           .updateTable("worker_session_placements")

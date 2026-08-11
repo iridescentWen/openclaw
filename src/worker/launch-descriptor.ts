@@ -24,7 +24,7 @@ import {
   WorkerInferenceOptionsSchema,
 } from "../../packages/gateway-protocol/src/schema/worker-inference.js";
 import { PROTOCOL_VERSION } from "../../packages/gateway-protocol/src/version.js";
-import { isWorkerLocalToolName, type WorkerToolAuthority } from "./tool-authority.js";
+import { isWorkerToolName, type WorkerToolAuthority } from "./tool-authority.js";
 import { isWorkerTranscriptMessageFrameSafe } from "./transcript-message.js";
 
 const LAUNCH_VERSION = 2;
@@ -96,7 +96,7 @@ function parseToolAuthority(value: unknown): WorkerToolAuthority | undefined {
     !isRecord(value) ||
     !hasExactKeys(value, ["allowedToolNames"]) ||
     !Array.isArray(value.allowedToolNames) ||
-    !value.allowedToolNames.every(isWorkerLocalToolName) ||
+    !value.allowedToolNames.every(isWorkerToolName) ||
     new Set(value.allowedToolNames).size !== value.allowedToolNames.length
   ) {
     return undefined;
