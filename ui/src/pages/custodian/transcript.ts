@@ -31,6 +31,7 @@ export type CustodianMessage = {
 
 export type CustodianStructuredResponse = {
   display: string;
+  kind: "answer" | "cancel";
   state: "submitting" | "submitted" | "uncertain";
 };
 
@@ -144,7 +145,7 @@ function createCustodianTranscriptMessages(
         at: turn.at,
         question: null,
         step: turn.wizardAction.step,
-        structuredResponse: { display, state: "submitted" },
+        structuredResponse: { display, kind: turn.wizardAction.kind, state: "submitted" },
         ...(turn.sessionId ? { sessionId: turn.sessionId } : {}),
       });
       continue;
@@ -300,8 +301,14 @@ function renderStructuredResponse(message: CustodianMessage) {
   if (!response) {
     return nothing;
   }
-  const status =
-    response.state === "submitting"
+  const cancelled = response.kind === "cancel";
+  const status = cancelled
+    ? response.state === "submitting"
+      ? t("custodian.structured.cancelling")
+      : response.state === "uncertain"
+        ? t("custodian.structured.cancellationUnavailable")
+        : t("custodian.structured.cancelled")
+    : response.state === "submitting"
       ? t("custodian.structured.submitting")
       : response.state === "uncertain"
         ? t("custodian.structured.confirmationUnavailable")
@@ -311,7 +318,13 @@ function renderStructuredResponse(message: CustodianMessage) {
     aria-label=${t("custodian.structured.response")}
     aria-busy=${response.state === "submitting" ? "true" : "false"}
   >
-    <span class="custodian__structured-response-icon" aria-hidden="true">${icons.check}</span>
+    <span
+      class="custodian__structured-response-icon ${cancelled
+        ? "custodian__structured-response-icon--cancelled"
+        : ""}"
+      aria-hidden="true"
+      >${cancelled ? icons.stop : icons.check}</span
+    >
     <span class="custodian__structured-response-copy">
       <span class="custodian__structured-response-prompt">${structuredPrompt(message)}</span>
       <strong>${response.display}</strong>

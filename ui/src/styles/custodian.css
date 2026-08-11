@@ -335,6 +335,11 @@ openclaw-custodian-page {
   height: 14px;
 }
 
+.custodian__structured-response-icon--cancelled {
+  background: color-mix(in srgb, var(--text-muted) 18%, transparent);
+  color: var(--text-muted);
+}
+
 .custodian__structured-response-copy {
   display: grid;
   min-width: 0;

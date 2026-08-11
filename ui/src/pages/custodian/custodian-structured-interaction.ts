@@ -51,6 +51,7 @@ export function createCustodianStructuredInteraction(host: StructuredInteraction
     message: CustodianMessage;
     request: SystemAgentChatParams;
     display: string;
+    kind: CustodianStructuredResponse["kind"];
   }): Promise<eventNudgeState.CustodianSendOutcome> => {
     const state = host.state();
     if (
@@ -65,6 +66,7 @@ export function createCustodianStructuredInteraction(host: StructuredInteraction
     host.replaceMessages(
       withResponse(state.messages, params.message.id, {
         display: params.display,
+        kind: params.kind,
         state: "submitting",
       }) ?? [...state.messages],
     );
@@ -76,6 +78,7 @@ export function createCustodianStructuredInteraction(host: StructuredInteraction
         ? null
         : {
             display: params.display,
+            kind: params.kind,
             state: outcome === "unknown" ? "uncertain" : "submitted",
           };
     const messages = withResponse(current.messages, params.message.id, response);
@@ -162,6 +165,7 @@ export function createCustodianStructuredInteraction(host: StructuredInteraction
         message,
         request: { sessionId: state.sessionId, wizardAnswer: submission.answer },
         display: message.step?.sensitive ? t("custodian.sensitiveReply") : submission.display,
+        kind: "answer",
       });
     },
 
@@ -184,6 +188,7 @@ export function createCustodianStructuredInteraction(host: StructuredInteraction
         message,
         request: { sessionId: state.sessionId, wizardCancel: { stepId: step.id } },
         display: t("custodian.cancel"),
+        kind: "cancel",
       });
     },
   };

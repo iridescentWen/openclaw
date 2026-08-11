@@ -34,6 +34,27 @@ describe("Custodian wizard reload recovery", () => {
         if (params.sessionId === "live-wizard" && !cancelled) {
           return {
             turns: [
+              {
+                role: "assistant",
+                text: "Choose a previous channel.",
+                at: 0,
+                sessionId: "live-wizard",
+              },
+              {
+                role: "user",
+                text: "Cancel",
+                at: 0,
+                sessionId: "live-wizard",
+                wizardAction: {
+                  kind: "cancel",
+                  step: {
+                    id: "previous-channel",
+                    type: "select",
+                    message: "Choose a previous channel.",
+                    options: [{ label: "Telegram", value: "telegram" }],
+                  },
+                },
+              },
               { role: "user", text: "connect twitch", at: 1, sessionId: "live-wizard" },
               {
                 role: "assistant",
@@ -136,10 +157,14 @@ describe("Custodian wizard reload recovery", () => {
     });
     expect(recoveredInput.value).toBe("");
     expect(second.page.textContent).toContain("Enter the secret.");
-    expect(second.page.querySelectorAll(".custodian__structured-response")).toHaveLength(1);
-    expect(second.page.querySelector(".custodian__structured-response")?.textContent).toContain(
-      "Bot",
-    );
+    expect(second.page.querySelectorAll(".custodian__structured-response")).toHaveLength(2);
+    expect(
+      second.page.querySelector(".custodian__structured-response-icon--cancelled"),
+    ).not.toBeNull();
+    expect(second.page.textContent).toContain("Setup cancelled");
+    expect(
+      second.page.querySelectorAll(".custodian__structured-response")[1]?.textContent,
+    ).toContain("Bot");
     expect(second.page.querySelector(".chat-group.user")?.textContent).toContain("connect twitch");
     expect(second.page.querySelector("details")).toBeNull();
     expect(request.mock.calls.filter(([method]) => method === "openclaw.chat")).toHaveLength(1);
@@ -151,7 +176,7 @@ describe("Custodian wizard reload recovery", () => {
       wizardCancel: { stepId: "secret" },
     });
     expect(second.page.querySelector(".chat-group.user")?.textContent).not.toContain("Cancel");
-    expect(second.page.querySelectorAll(".custodian__structured-response")).toHaveLength(2);
+    expect(second.page.querySelectorAll(".custodian__structured-response")).toHaveLength(3);
     expect(readCustodianRecoveryForClient(recoveryClient, gatewayUrl)).toBeNull();
 
     second.provider.remove();
@@ -161,9 +186,8 @@ describe("Custodian wizard reload recovery", () => {
   });
 
   it("restores ordinary question answers as user turns instead of wizard receipts", async () => {
-    reconcileCustodianRecoveryForClient(
-      recoveryClient,
-      gatewayUrl,
+    reconcileCustodianRecoveryForScope(
+      recoveryOwner,
       {
         sessionId: "ordinary-answer-session",
         reply: "Choose a channel.",

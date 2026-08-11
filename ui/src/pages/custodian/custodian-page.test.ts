@@ -319,6 +319,10 @@ describe("custodian page", () => {
     expect(page.querySelector(".custodian__wizard-step")).toBeNull();
     expect(page.querySelector(".chat-group.user")).toBeNull();
     expect(page.querySelector(".custodian__structured-response")?.textContent).toContain("Cancel");
+    expect(page.querySelector(".custodian__structured-response")?.textContent).toContain(
+      "Setup cancelled",
+    );
+    expect(page.querySelector(".custodian__structured-response-icon--cancelled")).not.toBeNull();
     expect(page.querySelector(".agent-chat__composer-shell")).not.toBeNull();
   });
 
