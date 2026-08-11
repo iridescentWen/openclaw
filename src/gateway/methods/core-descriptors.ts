@@ -497,6 +497,9 @@ const CORE_GATEWAY_METHOD_SPECS = [
   ["projects.list", "projects", "operator.read", "2026.8"],
   ["projects.register", "projects", "operator.admin", "2026.8"],
   ["projects.remove", "projects", "operator.admin", "2026.8"],
+  // Self-scoped preferences append so every older advertised index remains stable.
+  ["users.prefs.get", "users", "operator.read", "2026.8"],
+  ["users.prefs.set", "users", "operator.write", "2026.8"],
 ] as const satisfies readonly CoreGatewayMethodSpecRow[];
 
 export type CoreGatewayHandlerFamily = Exclude<(typeof CORE_GATEWAY_METHOD_SPECS)[number][1], null>;

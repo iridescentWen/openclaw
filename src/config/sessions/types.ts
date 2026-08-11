@@ -369,6 +369,8 @@ type SessionEntryCore = SessionRestartRecoveryState &
      * creation and cleared together when a plain New Chat detaches the checkout.
      */
     worktree?: { id: string; branch: string; repoRoot: string };
+    /** Project registry id selected when this logical session node was created. */
+    projectId?: string;
     /** Explicit parent session linkage for dashboard-created child sessions. */
     parentSessionKey?: string;
     /** How this session node came to exist; written once and retained across sessionId rotations. */
@@ -760,6 +762,9 @@ function mergeSessionEntryWithPolicy(
   }
   if (existing.createdAt !== undefined) {
     next.createdAt = existing.createdAt;
+  }
+  if (existing.projectId !== undefined) {
+    next.projectId = existing.projectId;
   }
   if (existing.forkSource !== undefined) {
     next.forkSource = existing.forkSource;
