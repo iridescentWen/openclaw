@@ -1165,7 +1165,7 @@ export async function monitorIMessageProvider(opts: MonitorIMessageOpts = {}): P
           }
         : false,
       observeMessageSent: true,
-      deliver: async (payload: Parameters<typeof deliverIMessageReply>[0]["payload"]) => {
+      deliver: async (payload: Parameters<typeof deliverIMessageReply>[0]["payload"], info) => {
         const target = ctxPayload.To;
         if (!target) {
           runtime.error?.(danger("imessage: missing delivery target"));
@@ -1183,6 +1183,7 @@ export async function monitorIMessageProvider(opts: MonitorIMessageOpts = {}): P
           maxBytes: mediaMaxBytes,
           textLimit,
           sentMessageCache,
+          onPlatformSendDispatch: info.onPlatformSendDispatch,
         });
       },
       onError: (err, info) => {

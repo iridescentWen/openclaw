@@ -86,7 +86,10 @@ type WhatsAppInboundTransportContext = WhatsAppReplyTransportContext & {
   sendComposing: AdmittedWebInboundMessage["platform"]["sendComposing"];
 };
 
-type ReplyDeliveryInfo = { kind: ReplyLifecycleKind };
+type ReplyDeliveryInfo = {
+  kind: ReplyLifecycleKind;
+  onPlatformSendDispatch: () => Promise<void>;
+};
 
 type PendingWhatsAppMediaOnlyPayload = {
   info: ReplyDeliveryInfo;
@@ -168,7 +171,7 @@ function markWhatsAppReplyDeliveryErrorVisibleAfterFlush(
 
 function logWhatsAppReplyDeliveryError(params: {
   err: unknown;
-  info: ReplyDeliveryInfo;
+  info: { kind: string };
   connectionId: string;
   transport: WhatsAppInboundTransportContext;
   replyLogger: ReturnType<typeof getChildLogger>;
@@ -190,7 +193,7 @@ function logWhatsAppReplyDeliveryError(params: {
 
 function resolveWhatsAppDurableReplyToId(params: {
   context: FinalizedMsgContext;
-  info: ReplyDeliveryInfo;
+  info: Pick<ReplyDeliveryInfo, "kind">;
   currentMessageId?: string;
   payload: DeliverableWhatsAppOutboundPayload<ReplyPayload>;
 }): string | null {
@@ -249,7 +252,7 @@ function hasWhatsAppMediaUrlOverlap(left: Set<string>, right: Set<string>): bool
 }
 
 function shouldDeferWhatsAppMediaOnlyPayload(params: {
-  info: ReplyDeliveryInfo;
+  info: Pick<ReplyDeliveryInfo, "kind">;
   mediaUrls: Set<string>;
   reply: ReturnType<typeof resolveSendableOutboundReplyParts>;
 }): boolean {
@@ -678,6 +681,7 @@ export function createWhatsAppReplyPlan(params: {
     }
     let delivery: WhatsAppReplyDeliveryResult;
     try {
+      await info.onPlatformSendDispatch();
       delivery = await params.deliverReply({
         replyResult: normalizedDeliveryPayload,
         normalizedReplyResult: normalizedDeliveryPayload,
@@ -800,7 +804,7 @@ export function createWhatsAppReplyPlan(params: {
         },
       };
     },
-    deliver: async (payload: ReplyPayload, info: { kind: ReplyLifecycleKind }) => {
+    deliver: async (payload: ReplyPayload, info: ReplyDeliveryInfo) => {
       const normalizedDeliveryPayload = payload as DeliverableWhatsAppOutboundPayload<ReplyPayload>;
       const reply = resolveSendableOutboundReplyParts(normalizedDeliveryPayload);
       if (!reply.hasMedia && !reply.text.trim()) {
@@ -849,7 +853,7 @@ export function createWhatsAppReplyPlan(params: {
       }
       logWhatsAppReplyDeliveryError({
         err,
-        info: info as ReplyDeliveryInfo,
+        info,
         connectionId: params.connectionId,
         transport: params.transport,
         replyLogger: params.replyLogger,

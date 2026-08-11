@@ -1,6 +1,7 @@
 // Outbound payload planning normalizes reply payloads into sendable text,
 // media, presentation, interactive, and mirror projections.
 import { resolveSendableOutboundReplyParts } from "openclaw/plugin-sdk/reply-payload";
+import { copyReplyPayloadMetadata } from "../../auto-reply/reply-payload.js";
 import {
   mergeReactionDirectiveChannelData,
   parseReplyDirectives,
@@ -242,7 +243,7 @@ function createOutboundPayloadPlanEntry(
   const hasMultipleMedia = (explicitMediaUrls?.length ?? 0) > 1;
   const resolvedMediaUrl = hasMultipleMedia ? undefined : explicitMediaUrl;
   const channelData = mergeReactionDirectiveChannelData(payload.channelData, parsed.reaction);
-  const normalizedPayload: ReplyPayload = {
+  const normalizedPayload: ReplyPayload = copyReplyPayloadMetadata(payload, {
     ...payload,
     text:
       formatBtwTextForExternalDelivery({
@@ -256,7 +257,7 @@ function createOutboundPayloadPlanEntry(
     replyToCurrent: payload.replyToCurrent || parsed.replyToCurrent,
     audioAsVoice: Boolean(payload.audioAsVoice || parsed.audioAsVoice),
     ...(channelData ? { channelData } : {}),
-  };
+  });
   if (!isRenderablePayload(normalizedPayload)) {
     return null;
   }
@@ -317,19 +318,21 @@ export function projectOutboundPayloadPlanForOutbound(
     ) {
       continue;
     }
-    normalizedPayloads.push({
-      text,
-      mediaUrls: entry.parts.mediaUrls,
-      audioAsVoice: payload.audioAsVoice === true ? true : undefined,
-      ...(entry.hasPresentation ? { presentation: payload.presentation } : {}),
-      ...(entry.hasPresentation && payload.presentationTextMode
-        ? { presentationTextMode: payload.presentationTextMode }
-        : {}),
-      ...(payload.delivery ? { delivery: payload.delivery } : {}),
-      ...(entry.hasInteractive ? { interactive: payload.interactive } : {}),
-      ...(entry.hasChannelData ? { channelData: payload.channelData } : {}),
-      ...(payload.location ? { location: payload.location } : {}),
-    });
+    normalizedPayloads.push(
+      copyReplyPayloadMetadata(payload, {
+        text,
+        mediaUrls: entry.parts.mediaUrls,
+        audioAsVoice: payload.audioAsVoice === true ? true : undefined,
+        ...(entry.hasPresentation ? { presentation: payload.presentation } : {}),
+        ...(entry.hasPresentation && payload.presentationTextMode
+          ? { presentationTextMode: payload.presentationTextMode }
+          : {}),
+        ...(payload.delivery ? { delivery: payload.delivery } : {}),
+        ...(entry.hasInteractive ? { interactive: payload.interactive } : {}),
+        ...(entry.hasChannelData ? { channelData: payload.channelData } : {}),
+        ...(payload.location ? { location: payload.location } : {}),
+      }),
+    );
   }
   return normalizedPayloads;
 }

@@ -182,6 +182,17 @@ describe("createGatewayInstanceRuntime", () => {
           }),
         );
         expect(handleAction).not.toHaveBeenCalled();
+
+        sendText.mockResolvedValueOnce({ channel: "signal", messageId: "" });
+        await expect(
+          runtime.recovery.sendRecoveryNotice({
+            channel: "signal",
+            to: "+15551234567",
+            accountId: "work",
+            text: "Unconfirmed recovery notice",
+            idempotencyKey: "main-session-restart-recovery:run-2:failed-notice",
+          }),
+        ).rejects.toThrow("Recovery notice delivery outcome is unconfirmed");
       } finally {
         runtime.close();
         setActivePluginRegistry(createTestRegistry([]));

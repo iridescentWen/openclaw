@@ -582,6 +582,10 @@ async function runWhatsAppReplyPlan(
     dispatcherOptions: {
       ...plan.dispatcherOptions,
       deliver: async (payload, info) => {
+        const deliveryInfo = {
+          ...info,
+          onPlatformSendDispatch: async () => {},
+        };
         // The dispatcher fixture retains null as the explicit no-native-reply sentinel.
         const deliveryInput = payload as unknown as Parameters<typeof plan.delivery.deliver>[0];
         const prepared = plan.delivery.preparePayload
@@ -632,14 +636,14 @@ async function runWhatsAppReplyPlan(
             visibleReplySent: false,
             suppression: { reason: "cancelled_by_message_sending_hook" as const },
           };
-          await plan.delivery.onDelivered?.(prepared, info, result);
+          await plan.delivery.onDelivered?.(prepared, deliveryInfo, result);
           return result;
         }
-        const result = await plan.delivery.deliver(prepared, info);
+        const result = await plan.delivery.deliver(prepared, deliveryInfo);
         if (result?.finalization) {
           void result.finalization.catch(() => undefined);
         }
-        await plan.delivery.onDelivered?.(prepared, info, result);
+        await plan.delivery.onDelivered?.(prepared, deliveryInfo, result);
         return result;
       },
       onError: plan.delivery.onError,

@@ -11,8 +11,9 @@ import {
   createChannelTestPluginBase,
   createTestRegistry,
 } from "../../test-utils/channel-plugins.js";
-import { setReplyPayloadMetadata } from "../reply-payload.js";
+import { getReplyPayloadMetadata, setReplyPayloadMetadata } from "../reply-payload.js";
 import { SILENT_REPLY_TOKEN } from "../tokens.js";
+import type { ReplyPayload } from "../types.js";
 
 const mocks = vi.hoisted(() => ({
   deliverOutboundPayloads: vi.fn(),
@@ -132,14 +133,14 @@ function expectLastDeliveryFields(fields: Record<string, unknown>) {
   }
 }
 
-function lastDeliveryPayload(index = 0): Record<string, unknown> {
+function lastDeliveryPayload(index = 0): ReplyPayload & Record<string, unknown> {
   const payloads = lastDelivery().payloads;
   expect(Array.isArray(payloads)).toBe(true);
   const payload = (payloads as unknown[])[index];
   if (!payload || typeof payload !== "object") {
     throw new Error(`expected delivery payload ${index}`);
   }
-  return payload as Record<string, unknown>;
+  return payload as ReplyPayload & Record<string, unknown>;
 }
 
 function routeTestReply(
@@ -225,6 +226,28 @@ describe("routeReply", () => {
 
   afterEach(() => {
     setActivePluginRegistry(createTestRegistry());
+  });
+
+  it("preserves pending-final custody through route projection", async () => {
+    const completion = {
+      context: { channel: "telegram", to: "chat-1", accountId: "default" },
+      createdAt: 100,
+      deliveryId: "delivery-1",
+      intentId: "intent-1",
+      sessionId: "session-1",
+      sessionKey: "agent:main:telegram:direct:chat-1",
+      storePath: "/tmp/sessions.json",
+    };
+    const payload = setReplyPayloadMetadata(
+      { text: "hello" },
+      { pendingFinalDeliveryCompletion: completion },
+    );
+
+    await routeTestReply({ payload, channel: "telegram", to: "chat-1" });
+
+    expect(getReplyPayloadMetadata(lastDeliveryPayload())?.pendingFinalDeliveryCompletion).toEqual(
+      completion,
+    );
   });
 
   it("skips sends when abort signal is already aborted", async () => {

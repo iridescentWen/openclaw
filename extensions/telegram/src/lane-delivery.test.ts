@@ -184,6 +184,35 @@ describe("createLaneTextDeliverer", () => {
     expect(harness.lanes.answer.finalized).toBe(true);
   });
 
+  it("does not claim an equal visible preview for cleanup-only finalization", async () => {
+    const events: string[] = [];
+    const answer = createTestDraftStream({ messageId: 999 });
+    answer.update(HELLO_FINAL);
+    answer.update.mockClear();
+    const harness = createHarness({ answerStream: answer });
+    const finalizationCrash = new Error("injected finalization crash");
+    harness.stopDraftLane.mockImplementationOnce(async () => {
+      events.push("finalize");
+      throw finalizationCrash;
+    });
+    const onPlatformSendDispatch = vi.fn(async () => {
+      events.push("custody");
+    });
+
+    const result = await harness.deliverLaneText({
+      laneName: "answer",
+      text: HELLO_FINAL,
+      payload: { text: HELLO_FINAL },
+      infoKind: "final",
+      onPlatformSendDispatch,
+    });
+
+    expectPreviewFinalized(result);
+    expect(events).toEqual(["finalize"]);
+    expect(answer.update).not.toHaveBeenCalled();
+    expect(onPlatformSendDispatch).not.toHaveBeenCalled();
+  });
+
   it("streams block and final text through the same lane", async () => {
     const harness = createHarness({ answerMessageId: 999 });
 

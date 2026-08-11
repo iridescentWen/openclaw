@@ -4,7 +4,7 @@ const DISCORD_SESSION_CONFLICT_FAILURE_TEXT =
 
 type TerminalFailureDelivery = (
   payload: { text: string; isError: true },
-  info: { kind: "final" },
+  info: { kind: "final"; onPlatformSendDispatch: () => Promise<void> },
 ) => Promise<unknown>;
 type DeliveryErrorHandler = (error: unknown, info: { kind: string }) => void;
 
@@ -24,7 +24,7 @@ export async function completeDiscordSessionConflict(
   try {
     await deliver(
       { text: DISCORD_SESSION_CONFLICT_FAILURE_TEXT, isError: true },
-      { kind: "final" },
+      { kind: "final", onPlatformSendDispatch: async () => {} },
     );
     return true;
   } catch (deliveryError) {

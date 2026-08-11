@@ -317,6 +317,7 @@ export async function dispatchMattermostInboundTurn(
         previewState,
         logVerboseMessage: monitor.logVerboseMessage,
         recordThreadParticipation: markThreadParticipation,
+        onPlatformSendDispatch: info.onPlatformSendDispatch,
         deliverPayload: async (payloadToDeliver) => {
           const finalTextResolution =
             info.kind === "final" &&
@@ -347,6 +348,7 @@ export async function dispatchMattermostInboundTurn(
             tableMode,
             sendMessage: sendMessageMattermost,
             onDmChannelResolution: deliveryBarrier.trackDmChannelResolution,
+            onPlatformSendDispatch: info.onPlatformSendDispatch,
           }).catch((error: unknown) => {
             if (isChannelPartialDeliveryError(error)) {
               markThreadParticipation();

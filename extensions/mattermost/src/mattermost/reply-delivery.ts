@@ -124,6 +124,7 @@ export async function deliverMattermostReplyPayload(params: {
   tableMode: MarkdownTableMode;
   sendMessage: SendMattermostMessage;
   onDmChannelResolution?: (resolution: PromiseLike<unknown>) => void;
+  onPlatformSendDispatch?: () => Promise<void>;
 }): Promise<MattermostReplyDeliveryResult> {
   if (isReasoningReplyPayload(params.payload)) {
     return {
@@ -154,6 +155,7 @@ export async function deliverMattermostReplyPayload(params: {
       chunkText: (value) =>
         params.core.channel.text.chunkMarkdownTextWithMode(value, params.textLimit, chunkMode),
       sendText: async (chunk) => {
+        await params.onPlatformSendDispatch?.();
         const result = await params.sendMessage(params.to, chunk, {
           cfg: params.cfg,
           accountId: params.accountId,
@@ -166,6 +168,7 @@ export async function deliverMattermostReplyPayload(params: {
         acceptedContents.push(result.content);
       },
       sendMedia: async ({ mediaUrl, caption }) => {
+        await params.onPlatformSendDispatch?.();
         const result = await params.sendMessage(params.to, caption ?? "", {
           cfg: params.cfg,
           accountId: params.accountId,

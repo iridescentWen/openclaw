@@ -4,6 +4,7 @@ import { resolveAgentConfig, resolveHumanDelayConfig } from "openclaw/plugin-sdk
 import {
   dispatchChannelInboundTurn,
   hasFinalInboundReplyDispatch,
+  type ChannelInboundTurnPlan,
 } from "openclaw/plugin-sdk/channel-inbound";
 import {
   bindIngressLifecycleToReplyOptions,
@@ -222,9 +223,10 @@ async function processDiscordMessageInner(
   };
   let userFacingFinalDelivered = false;
   let userFacingFinalDeliveryFailed = false;
-  let pendingToolWarningFinal:
-    | { payload: ReplyPayload; info: { kind: ReplyDispatchKind } }
-    | undefined;
+  type DiscordDeliveryInfo = Parameters<
+    ChannelInboundTurnPlan<"provider_message_sending">["delivery"]["deliverWithProviderMessageSending"]
+  >[1];
+  let pendingToolWarningFinal: { payload: ReplyPayload; info: DiscordDeliveryInfo } | undefined;
   const markUserFacingFinalDelivered = () => {
     userFacingFinalDelivered = true;
     userFacingFinalDeliveryFailed = false;
@@ -271,7 +273,7 @@ async function processDiscordMessageInner(
 
   const deliverDiscordPayload = async (
     payload: ReplyPayload,
-    info: { kind: ReplyDispatchKind },
+    info: DiscordDeliveryInfo,
     options?: {
       allowFallbackOnlyToolWarning?: boolean;
       allowProgressBlock?: boolean;
@@ -327,6 +329,7 @@ async function processDiscordMessageInner(
         sessionKey: ctxPayload.SessionKey,
         threadBindings,
         mediaLocalRoots,
+        ...info,
         kind: "block",
       });
       if (result.visibleReplySent) {
@@ -483,7 +486,7 @@ async function processDiscordMessageInner(
             threadBindings,
             mediaLocalRoots,
             allowedMentions,
-            kind: info.kind,
+            ...info,
           });
           return deliveryResult.visibleReplySent;
         },
@@ -541,7 +544,7 @@ async function processDiscordMessageInner(
       sessionKey: ctxPayload.SessionKey,
       threadBindings,
       mediaLocalRoots,
-      kind: info.kind,
+      ...info,
     });
     if (!result.visibleReplySent) {
       return result;
@@ -688,7 +691,7 @@ async function processDiscordMessageInner(
         (receiptText) =>
           deliverDiscordPayload(
             { text: receiptText },
-            { kind: "block" },
+            { kind: "block", onPlatformSendDispatch: async () => {} },
             { allowProgressBlock: true },
           ),
         (error) =>

@@ -542,14 +542,6 @@ export function createAcpDispatchDeliveryCoordinator(params: {
         replyKind: kind,
         runId: params.runId,
       });
-      if (!result.delivered && hasFinalTtsMedia && ttsPayload.text?.trim()) {
-        if (!result.suppressed) {
-          logVerbose(
-            `dispatch-acp: route-reply (acp/${kind}) failed: ${result.error ?? "unknown error"}`,
-          );
-        }
-        return await deliver("final", { text: ttsPayload.text }, { skipTts: true });
-      }
       if (!result.delivered && !result.suppressed) {
         if (tracksVisibleText) {
           state.failedVisibleTextDelivery = true;

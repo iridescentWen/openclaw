@@ -22,7 +22,11 @@ import { normalizeAccountId } from "../../routing/account-id.js";
 import { createLazyImportLoader } from "../../shared/lazy-promise.js";
 import type { SilentReplyConversationType } from "../../shared/silent-reply-policy.js";
 import { INTERNAL_MESSAGE_CHANNEL, normalizeMessageChannel } from "../../utils/message-channel.js";
-import { getReplyPayloadMetadata, type ReplyDeliveryContext } from "../reply-payload.js";
+import {
+  copyReplyPayloadMetadata,
+  getReplyPayloadMetadata,
+  type ReplyDeliveryContext,
+} from "../reply-payload.js";
 import type { OriginatingChannelType } from "../templating.js";
 import type { ReplyPayload } from "../types.js";
 import { normalizeReplyPayload } from "./normalize-reply.js";
@@ -217,10 +221,10 @@ export async function routeReply(params: RouteReplyParams): Promise<RouteReplyRe
   if (!normalized) {
     return { ok: true, delivered: false };
   }
-  const externalPayload: ReplyPayload = {
+  const externalPayload: ReplyPayload = copyReplyPayloadMetadata(normalized, {
     ...normalized,
     text: formatBtwTextForExternalDelivery(normalized),
-  };
+  });
 
   const text = externalPayload.text ?? "";
   let mediaUrls: string[] = [];
@@ -302,10 +306,16 @@ export async function routeReply(params: RouteReplyParams): Promise<RouteReplyRe
     replyTransport && Object.hasOwn(replyTransport, "threadId")
       ? (replyTransport.threadId ?? null)
       : (threadId ?? null);
-  const deliveryPayload = {
+  const deliveryPayload = copyReplyPayloadMetadata(externalPayload, {
     ...externalPayload,
     replyToId: resolvedReplyToId,
-  };
+  });
+  if (
+    getReplyPayloadMetadata(normalized)?.pendingFinalDeliveryCompletion &&
+    !getReplyPayloadMetadata(deliveryPayload)?.pendingFinalDeliveryCompletion
+  ) {
+    throw new Error("pending final delivery completion was lost during route projection");
+  }
 
   try {
     // Provider docking: this is an execution boundary (we're about to send).

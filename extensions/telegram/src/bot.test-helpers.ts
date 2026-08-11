@@ -38,7 +38,11 @@ export async function runTelegramChannelInboundEventWithHarness(
               cfg: plan.cfg,
               dispatcherOptions: {
                 ...plan.dispatcherOptions,
-                deliver: plan.delivery.deliverWithProviderMessageSending,
+                deliver: async (payload, info) =>
+                  await plan.delivery.deliverWithProviderMessageSending(payload, {
+                    ...info,
+                    onPlatformSendDispatch: info.onPlatformSendDispatch ?? (async () => {}),
+                  }),
                 onError: plan.delivery.onError,
               },
               toolsAllow: plan.toolsAllow,

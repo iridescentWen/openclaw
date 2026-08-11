@@ -1,16 +1,22 @@
 // Channel turn delivery tests cover orchestration, dispatch, and completion behavior.
+/* oxlint-disable max-lines -- Delivery ordering tests share one mocked lifecycle graph. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ReplyPayload } from "../../auto-reply/reply-payload.js";
+import {
+  getReplyPayloadMetadata,
+  setReplyPayloadMetadata,
+  type ReplyPayload,
+} from "../../auto-reply/reply-payload.js";
 import type { DispatchReplyWithBufferedBlockDispatcher } from "../../auto-reply/reply/provider-dispatcher.types.js";
 import type { FinalizedMsgContext } from "../../auto-reply/templating.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { resetDiagnosticEventsForTest } from "../../infra/diagnostic-events.js";
+import { PlatformMessageNotDispatchedError } from "../../infra/outbound/deliver-types.js";
 import { resetLogger, setLoggerOverride } from "../../logging/logger.js";
 import { outboundMessageIdentities } from "../message/outbound-echo-state.js";
 import type { RecordInboundSession } from "../session.types.js";
 import { hasVisibleChannelTurnDispatch } from "./dispatch-result.js";
 import { dispatchAssembledChannelTurn, dispatchRoutedChannelTurn } from "./lifecycle.js";
-import type { ChannelTurnResult } from "./types.js";
+import type { ChannelDeliveryInfo, ChannelTurnResult } from "./types.js";
 
 const deliverOutboundPayloads = vi.hoisted(() => vi.fn());
 const resolveOutboundDurableFinalDeliverySupport = vi.hoisted(() => vi.fn());
@@ -24,6 +30,12 @@ const createMessageSentEmitter = vi.hoisted(() =>
   vi.fn(() => ({ emitMessageSent, hasMessageSentHooks: true })),
 );
 const readRecentUserAssistantTextForSession = vi.hoisted(() => vi.fn());
+const settlePendingFinalDelivery = vi.hoisted(() =>
+  vi.fn(async (_completion: unknown, state: string) => ({ state })),
+);
+const claimPreparedPendingFinalDelivery = vi.hoisted(() =>
+  vi.fn(async (_completion: unknown, state: string) => ({ state, applied: true })),
+);
 
 vi.mock("../../auto-reply/reply/provider-dispatcher.js", async (importOriginal) => {
   const actual =
@@ -76,6 +88,12 @@ vi.mock("../../plugins/hook-runner-global.js", async (importOriginal) => {
 vi.mock("../../config/sessions/transcript.js", () => ({
   readRecentUserAssistantTextForSession,
 }));
+
+vi.mock("../../infra/outbound/delivery-completion.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../infra/outbound/delivery-completion.js")>();
+  return { ...actual, claimPreparedPendingFinalDelivery, settlePendingFinalDelivery };
+});
 
 const cfg = {} as OpenClawConfig;
 
@@ -217,6 +235,13 @@ describe("channel turn delivery", () => {
     }));
     getGlobalHookRunner.mockReturnValue(null);
     readRecentUserAssistantTextForSession.mockResolvedValue([]);
+    settlePendingFinalDelivery.mockImplementation(async (_completion, state: string) => ({
+      state,
+    }));
+    claimPreparedPendingFinalDelivery.mockImplementation(async (_completion, state: string) => ({
+      state,
+      applied: true,
+    }));
   });
 
   afterEach(() => {
@@ -262,7 +287,7 @@ describe("channel turn delivery", () => {
     expect(events).toEqual(["prepare", "message_sending", "deliver"]);
     expect(deliver).toHaveBeenCalledWith(
       { text: "reply + prepared + message-hook", mediaUrls: ["media://1"] },
-      { kind: "final" },
+      expect.objectContaining({ kind: "final" }),
     );
     expect(runMessageSending).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -284,6 +309,163 @@ describe("channel turn delivery", () => {
     );
     expectDispatched(result);
     expect(result.dispatchResult.counts.final).toBe(1);
+  });
+
+  it("claims direct custody after payload rewrites and before platform I/O", async () => {
+    const order: string[] = [];
+    const completion = {
+      context: { channel: "telegram", to: "chat-1", accountId: "acct" },
+      createdAt: 100,
+      deliveryId: "delivery-1",
+      intentId: "intent-1",
+      sessionId: "session-1",
+      sessionKey: "agent:main:telegram:peer",
+      storePath: "/tmp/sessions.json",
+    };
+    const sourcePayload = setReplyPayloadMetadata(
+      { text: "reply" },
+      { pendingFinalDeliveryCompletion: completion },
+    );
+    dispatchReplyWithRoutedChannelDispatcherCore.mockImplementationOnce(async (params) => {
+      await params.dispatcherOptions.deliver(sourcePayload, { kind: "final" });
+      return { queuedFinal: true, counts: { tool: 0, block: 0, final: 1 } };
+    });
+    getGlobalHookRunner.mockReturnValue({
+      hasHooks: (name: string) => name === "message_sending",
+      runMessageSending: vi.fn(async ({ content }: { content: string }) => ({
+        content: `${content} + hook`,
+      })),
+    });
+    claimPreparedPendingFinalDelivery.mockImplementation(async (_completion, state: string) => {
+      order.push(`settle:${state}`);
+      return { state, applied: true };
+    });
+    const deliver = vi.fn(async (payload: ReplyPayload, info: ChannelDeliveryInfo) => {
+      expect(getReplyPayloadMetadata(payload)?.pendingFinalDeliveryCompletion).toEqual(completion);
+      order.push("preflight");
+      await info.onPlatformSendDispatch?.();
+      order.push("platform");
+      return { messageIds: ["direct-1"], visibleReplySent: true };
+    });
+
+    await dispatchRoutedChannelTurn({
+      cfg,
+      channel: "telegram",
+      accountId: "acct",
+      route: { agentId: "main", sessionKey: completion.sessionKey },
+      ctxPayload: createCtx({ Surface: "telegram", OriginatingTo: "chat-1" }),
+      delivery: {
+        preparePayload: (payload) => ({ ...payload, text: `${payload.text} + prepared` }),
+        deliver,
+      },
+    });
+
+    expect(order).toEqual(["preflight", "settle:queued", "platform", "settle:delivered"]);
+    expect(deliver.mock.calls[0]?.[0]).toMatchObject({ text: "reply + prepared + hook" });
+    expect(claimPreparedPendingFinalDelivery).toHaveBeenNthCalledWith(
+      1,
+      { kind: "pending-final", ...completion },
+      "queued",
+    );
+  });
+
+  it("classifies failures from a legacy adapter that ignores custody", async () => {
+    const completion = {
+      context: { channel: "telegram", to: "chat-1", accountId: "acct" },
+      createdAt: 100,
+      deliveryId: "delivery-legacy",
+      intentId: "intent-legacy",
+      sessionId: "session-legacy",
+      sessionKey: "agent:main:telegram:legacy",
+      storePath: "/tmp/sessions.json",
+    };
+    const sourcePayload = setReplyPayloadMetadata(
+      { text: "reply" },
+      { pendingFinalDeliveryCompletion: completion },
+    );
+    const dispatchReplyWithBufferedBlockDispatcher = vi.fn(async (params) => {
+      await params.dispatcherOptions.deliver(sourcePayload, { kind: "final" });
+      return { queuedFinal: true, counts: { tool: 0, block: 0, final: 1 } };
+    }) as DispatchReplyWithBufferedBlockDispatcher;
+    const run = (error: Error) =>
+      dispatchTestAssembledTurn({
+        channel: "telegram",
+        accountId: "acct",
+        routeSessionKey: completion.sessionKey,
+        ctxPayload: createCtx({ To: "123", OriginatingTo: "123" }),
+        recordInboundSession: createRecordInboundSession(),
+        dispatchReplyWithBufferedBlockDispatcher,
+        delivery: {
+          deliver: vi.fn(async () => {
+            throw error;
+          }),
+        },
+      });
+
+    const preflight = new PlatformMessageNotDispatchedError("legacy preflight failed", {
+      cause: new Error("local preflight"),
+    });
+    await expect(run(preflight)).rejects.toBe(preflight);
+    expect(claimPreparedPendingFinalDelivery).not.toHaveBeenCalled();
+
+    const ambiguous = new Error("legacy adapter failed after entry");
+    await expect(run(ambiguous)).rejects.toBe(ambiguous);
+    expect(claimPreparedPendingFinalDelivery).toHaveBeenCalledWith(
+      { kind: "pending-final", ...completion },
+      "queued",
+    );
+    expect(settlePendingFinalDelivery).toHaveBeenCalledWith(
+      { kind: "pending-final", ...completion },
+      "unknown",
+    );
+  });
+
+  it("terminalizes deferred provider failures after direct custody", async () => {
+    const completion = {
+      context: { channel: "telegram", to: "chat-1", accountId: "acct" },
+      createdAt: 100,
+      deliveryId: "delivery-deferred",
+      intentId: "intent-deferred",
+      sessionId: "session-deferred",
+      sessionKey: "agent:main:telegram:deferred",
+      storePath: "/tmp/sessions.json",
+    };
+    const payload = setReplyPayloadMetadata(
+      { text: "reply" },
+      { pendingFinalDeliveryCompletion: completion },
+    );
+    dispatchReplyWithRoutedChannelDispatcherCore.mockImplementationOnce(async (params) => {
+      await params.dispatcherOptions.deliver(payload, { kind: "final" });
+      return { queuedFinal: true, counts: { tool: 0, block: 0, final: 1 } };
+    });
+    const finalizationError = new Error("deferred provider result failed");
+
+    await expect(
+      dispatchRoutedChannelTurn({
+        cfg,
+        channel: "telegram",
+        accountId: "acct",
+        route: { agentId: "main", sessionKey: completion.sessionKey },
+        ctxPayload: createCtx({ Surface: "telegram", OriginatingTo: "chat-1" }),
+        delivery: {
+          deliver: async (_payload, info) => {
+            await info.onPlatformSendDispatch?.();
+            return {
+              visibleReplySent: false,
+              finalization: Promise.reject(finalizationError),
+            };
+          },
+        },
+      }),
+    ).rejects.toBe(finalizationError);
+    expect(claimPreparedPendingFinalDelivery).toHaveBeenCalledWith(
+      { kind: "pending-final", ...completion },
+      "queued",
+    );
+    expect(settlePendingFinalDelivery).toHaveBeenCalledWith(
+      { kind: "pending-final", ...completion },
+      "unknown",
+    );
   });
 
   it("does not let message hooks resurrect payloads suppressed during preparation", async () => {
@@ -424,7 +606,10 @@ describe("channel turn delivery", () => {
 
     expect(runMessageSending).toHaveBeenCalledTimes(2);
     expect(deliver).toHaveBeenCalledTimes(1);
-    expect(deliver).toHaveBeenCalledWith({ text: "deliver me" }, { kind: "block" });
+    expect(deliver).toHaveBeenCalledWith(
+      { text: "deliver me" },
+      expect.objectContaining({ kind: "block" }),
+    );
     expectDispatched(result);
     expect(result.dispatchResult).toMatchObject({
       queuedFinal: false,
@@ -454,7 +639,7 @@ describe("channel turn delivery", () => {
 
     expect(deliverWithProviderMessageSending).toHaveBeenCalledWith(
       { text: "reply" },
-      { kind: "final" },
+      expect.objectContaining({ kind: "final", onPlatformSendDispatch: expect.any(Function) }),
     );
     expect(runMessageSending).not.toHaveBeenCalled();
   });
@@ -485,7 +670,12 @@ describe("channel turn delivery", () => {
       ok: false,
       reason: "missing_outbound_handler",
     });
-    const fallbackDeliver = vi.fn(async () => ({ visibleReplySent: true }));
+    const fallbackDispatch = vi.fn();
+    const fallbackDeliver = vi.fn(async (_payload: ReplyPayload, info: ChannelDeliveryInfo) => {
+      await info.onPlatformSendDispatch?.();
+      fallbackDispatch();
+      return { visibleReplySent: true };
+    });
     await dispatchRoutedChannelTurn({
       cfg,
       channel: "telegram",
@@ -495,9 +685,10 @@ describe("channel turn delivery", () => {
     });
 
     expect(runMessageSending).toHaveBeenCalledTimes(1);
+    expect(fallbackDispatch).toHaveBeenCalledOnce();
     expect(fallbackDeliver).toHaveBeenCalledWith(
       { text: "reply + direct-hook" },
-      { kind: "final" },
+      expect.objectContaining({ kind: "final" }),
     );
   });
 
@@ -522,7 +713,7 @@ describe("channel turn delivery", () => {
 
     expect(onDelivered).toHaveBeenCalledWith(
       { text: "reply" },
-      { kind: "final" },
+      expect.objectContaining({ kind: "final" }),
       expect.objectContaining({
         messageIds: ["final-1"],
         visibleReplySent: true,
@@ -747,7 +938,10 @@ describe("channel turn delivery", () => {
       messageSendingHooks: true,
     });
     expect(deliverOutboundPayloads).not.toHaveBeenCalled();
-    expect(deliver).toHaveBeenCalledWith({ text: "reply" }, { kind: "final" });
+    expect(deliver).toHaveBeenCalledWith(
+      { text: "reply" },
+      expect.objectContaining({ kind: "final" }),
+    );
     const delivered = deliveryResult(deliveredResult);
     expect(delivered.messageIds).toEqual(["legacy-1"]);
     expect(delivered.visibleReplySent).toBe(true);

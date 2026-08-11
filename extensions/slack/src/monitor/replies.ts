@@ -420,6 +420,7 @@ export async function deliverSlackSlashReplies(params: {
   isGroup?: boolean;
   groupId?: string;
   responseBudget?: SlackResponseUrlBudget;
+  onPlatformSendDispatch?: (replyIndex: number) => Promise<void>;
   onReplySettled?: (settlement: {
     replyIndex: number;
     visibleReplySent: boolean;
@@ -639,8 +640,10 @@ export async function deliverSlackSlashReplies(params: {
   const deliverNativeFallback = async (
     messages: readonly SlackFormattingDisabledMessage[],
     onVisible: () => void,
+    replyIndex: number,
   ) => {
     for (const message of messages) {
+      await params.onPlatformSendDispatch?.(replyIndex);
       const response = await respond(message);
       if (await isSlackInvalidBlocksResponse(response)) {
         throw new Error("Slack rejected the native-data fallback blocks with invalid_blocks.");
@@ -661,6 +664,7 @@ export async function deliverSlackSlashReplies(params: {
         plannedIndex += 1;
         const fallback = planned.nativeFallback;
         if (!fallback) {
+          await params.onPlatformSendDispatch?.(delivery.replyIndex);
           await respond(planned.message);
           markVisible();
           continue;
@@ -670,11 +674,12 @@ export async function deliverSlackSlashReplies(params: {
           !planned.skipOriginalBlocks &&
           (remaining === undefined || 1 + fallback.length + minimumAfter <= remaining);
         if (!canAttemptNative) {
-          await deliverNativeFallback(fallback, markVisible);
+          await deliverNativeFallback(fallback, markVisible, delivery.replyIndex);
           continue;
         }
         let rejectedNativeBlocks = false;
         try {
+          await params.onPlatformSendDispatch?.(delivery.replyIndex);
           const response = await respond(planned.message);
           rejectedNativeBlocks = await isSlackInvalidBlocksResponse(response);
           if (!rejectedNativeBlocks) {
@@ -687,7 +692,7 @@ export async function deliverSlackSlashReplies(params: {
           rejectedNativeBlocks = true;
         }
         if (rejectedNativeBlocks) {
-          await deliverNativeFallback(fallback, markVisible);
+          await deliverNativeFallback(fallback, markVisible, delivery.replyIndex);
         }
       }
     } catch (error) {

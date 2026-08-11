@@ -441,7 +441,7 @@ export function createSignalEventHandler(deps: SignalEventHandlerDeps) {
       typingCallbacks,
     };
     const delivery: ChannelInboundTurnPlan["delivery"] = {
-      deliver: async (payload, _info) => {
+      deliver: async (payload, info) => {
         await deps.deliverReplies({
           cfg: deps.cfg,
           replies: [payload],
@@ -455,6 +455,7 @@ export function createSignalEventHandler(deps: SignalEventHandlerDeps) {
           textLimit: deps.textLimit,
           replyContext: nativeReplyContext,
           chatType: entry.isGroup ? "group" : "direct",
+          onPlatformSendDispatch: info.onPlatformSendDispatch,
         });
       },
       onError: (err, info) => {

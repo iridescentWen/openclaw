@@ -26,6 +26,7 @@ import {
 import { runOutboundDeliveryCommitHooks } from "./delivery-commit-hooks.js";
 import {
   completeDurableDelivery,
+  failDurableDelivery,
   rejectDurableDelivery,
   suppressDurableDelivery,
 } from "./delivery-completion.js";
@@ -303,9 +304,13 @@ export async function deliverOutboundPayloadsWithQueueCleanup(
     if (!queueId) {
       if (params.deliveryCompletion) {
         if (results.length > 0) {
-          completeDurableDelivery(params.deliveryCompletion, results.at(-1)!);
+          await completeDurableDelivery(
+            params.deliveryCompletion,
+            results.at(-1)!,
+            platformQueueStateDir,
+          );
         } else {
-          suppressDurableDelivery(params.deliveryCompletion);
+          await suppressDurableDelivery(params.deliveryCompletion, platformQueueStateDir);
         }
       }
       if (!params.deferCommitHooks) {
@@ -361,13 +366,6 @@ export async function deliverOutboundPayloadsWithQueueCleanup(
           );
         }
       } else {
-        if (params.deliveryCompletion) {
-          if (results.length > 0) {
-            completeDurableDelivery(params.deliveryCompletion, results.at(-1)!);
-          } else {
-            suppressDurableDelivery(params.deliveryCompletion);
-          }
-        }
         const postSendState =
           queuedPostSendState ??
           (results.length > 0 || queuedPreSendState === "marked"
@@ -375,6 +373,19 @@ export async function deliverOutboundPayloadsWithQueueCleanup(
             : queuedPreSendState === "acked"
               ? "acked"
               : undefined);
+        if (params.deliveryCompletion) {
+          if (results.length > 0) {
+            await completeDurableDelivery(
+              params.deliveryCompletion,
+              results.at(-1)!,
+              platformQueueStateDir,
+            );
+          } else if (postSendState === "marked") {
+            await failDurableDelivery(params.deliveryCompletion, platformQueueStateDir);
+          } else {
+            await suppressDurableDelivery(params.deliveryCompletion, platformQueueStateDir);
+          }
+        }
         if (results.length === 0 && postSendState === "marked") {
           // The provider was invoked but returned no recipient-visible identity;
           // never convert that ambiguous platform outcome into a success receipt.
@@ -562,7 +573,11 @@ export async function deliverOutboundPayloadsWithQueueCleanup(
                 terminalRejectionHandled = true;
               } else {
                 if (params.deliveryCompletion) {
-                  rejectDurableDelivery(params.deliveryCompletion, permanentRejection.message);
+                  await rejectDurableDelivery(
+                    params.deliveryCompletion,
+                    permanentRejection.message,
+                    platformQueueStateDir,
+                  );
                   ownerRejected = true;
                 }
                 await (producerClaimId

@@ -811,6 +811,7 @@ export async function registerSlackMonitorSlashCommands(params: {
       const deliverSlashPayloads = async (
         replies: Parameters<typeof deliverSlackSlashReplies>[0]["replies"],
         onReplySettled?: Parameters<typeof deliverSlackSlashReplies>[0]["onReplySettled"],
+        onPlatformSendDispatch?: Array<() => Promise<void>>,
       ) => {
         await deliverSlackSlashReplies({
           replies,
@@ -830,11 +831,14 @@ export async function registerSlackMonitorSlashCommands(params: {
           }),
           responseBudget,
           onReplySettled,
+          onPlatformSendDispatch: (replyIndex) =>
+            onPlatformSendDispatch?.[replyIndex]?.() ?? Promise.resolve(),
         });
       };
       const pendingSlashReplies: Array<{
         payload: Parameters<typeof deliverSlackSlashReplies>[0]["replies"][number];
         finalization: ReturnType<typeof createDeferred<{ visibleReplySent: boolean }>>;
+        onPlatformSendDispatch: () => Promise<void>;
       }> = [];
       const shouldDeliverBlockImmediately = commandDefinition?.key === "login";
 
@@ -879,6 +883,7 @@ export async function registerSlackMonitorSlashCommands(params: {
                   }
                   entry.finalization.resolve({ visibleReplySent });
                 },
+                pending.map((entry) => entry.onPlatformSendDispatch),
               );
             } catch (error) {
               const unsettledError = isChannelPartialDeliveryError(error)
@@ -899,9 +904,13 @@ export async function registerSlackMonitorSlashCommands(params: {
           deliver: async (payload, info) => {
             if (info.kind === "block" && shouldDeliverBlockImmediately) {
               let visibleReplySent = false;
-              await deliverSlashPayloads([payload], (settlement) => {
-                visibleReplySent = settlement.visibleReplySent;
-              });
+              await deliverSlashPayloads(
+                [payload],
+                (settlement) => {
+                  visibleReplySent = settlement.visibleReplySent;
+                },
+                [info.onPlatformSendDispatch],
+              );
               return visibleReplySent
                 ? { visibleReplySent: true }
                 : {
@@ -910,7 +919,11 @@ export async function registerSlackMonitorSlashCommands(params: {
                   };
             }
             const finalization = createDeferred<{ visibleReplySent: boolean }>();
-            pendingSlashReplies.push({ payload, finalization });
+            pendingSlashReplies.push({
+              payload,
+              finalization,
+              onPlatformSendDispatch: info.onPlatformSendDispatch,
+            });
             return { visibleReplySent: false, finalization: finalization.promise };
           },
           onError: (err, info) => {

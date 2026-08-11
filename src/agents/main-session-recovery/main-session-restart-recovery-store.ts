@@ -5,15 +5,18 @@ import {
   type InternalSessionEntry as SessionEntry,
   resolveSessionWorkStartError,
 } from "../../config/sessions.js";
+import { buildRestartRecoveryClaimCleanupPatch } from "../../config/sessions/restart-recovery-state.js";
 import {
   listSessionEntriesByStatus,
   loadExactSessionEntry,
+  updateSessionEntry,
 } from "../../config/sessions/session-accessor.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import type { GatewayRecoveryRuntime } from "../../gateway/server-instance-runtime.types.js";
 import { readSessionMessagesAsync } from "../../gateway/session-transcript-readers.js";
 import { resolveGatewaySessionStoreTarget } from "../../gateway/session-utils.js";
 import { getAgentEventLifecycleGeneration } from "../../infra/agent-events.js";
+import { findDeliveryIntentOwner } from "../../infra/outbound/delivery-queue-storage.js";
 import { resolveAgentIdFromSessionKey } from "../../routing/session-key.js";
 import { resolveDefaultAgentId } from "../agent-scope-config.js";
 import {
@@ -52,6 +55,88 @@ import {
   MAX_RECOVERY_RETRIES,
   normalizeStringSet,
 } from "./main-session-restart-recovery-shared.js";
+
+type PendingFinalRecoveryAction = "complete" | "defer" | "notice" | "retry";
+
+function resolvePendingFinalRecoveryAction(
+  entry: SessionEntry,
+  stateDir?: string,
+): PendingFinalRecoveryAction | undefined {
+  const deliveries = entry.pendingFinalDelivery?.deliveries;
+  if (!deliveries?.length) {
+    return undefined;
+  }
+  if (deliveries.every(({ state }) => state === "delivered" || state === "suppressed")) {
+    return "complete";
+  }
+  const owners = deliveries.map(({ id }) => findDeliveryIntentOwner(id, stateDir));
+  if (owners.some((owner) => owner?.status === "pending")) {
+    return "defer";
+  }
+  if (
+    deliveries.every(({ state }) => state === "prepared") &&
+    owners.every((owner) => owner === null)
+  ) {
+    return "retry";
+  }
+  return "notice";
+}
+
+async function completePendingFinalRecovery(
+  entry: SessionEntry,
+  sessionKey: string,
+  storePath: string,
+  withNotice: boolean,
+): Promise<boolean> {
+  const endedAt = Date.now();
+  let completed = false;
+  await updateSessionEntry(
+    { sessionKey, storePath },
+    (current) => {
+      if (
+        current.sessionId !== entry.sessionId ||
+        current.pendingFinalDelivery?.intentId !== entry.pendingFinalDelivery?.intentId
+      ) {
+        return null;
+      }
+      const pending = current.pendingFinalDelivery;
+      completed = true;
+      return {
+        ...buildRestartRecoveryClaimCleanupPatch({
+          entry: current,
+          recordTerminalSource: true,
+        }),
+        abortedLastRun: false,
+        endedAt,
+        lifecycleRunId: undefined,
+        pendingFinalDelivery: undefined,
+        ...(withNotice &&
+        pending?.context &&
+        pending.intentId &&
+        (!current.pendingDeliveryNotice ||
+          current.pendingDeliveryNotice.createdAt <= pending.createdAt)
+          ? {
+              pendingDeliveryNotice: {
+                createdAt: pending.createdAt,
+                context: pending.context,
+                intentId: pending.intentId,
+                state: "owed" as const,
+              },
+            }
+          : {}),
+        restartRecoveryRuns: undefined,
+        runtimeMs:
+          typeof current.startedAt === "number"
+            ? Math.max(0, endedAt - current.startedAt)
+            : undefined,
+        status: "done" as const,
+        updatedAt: endedAt,
+      };
+    },
+    { skipMaintenance: true, takeCacheOwnership: true },
+  );
+  return completed;
+}
 
 export function loadExpectedRestartRecoveryTarget(params: {
   expected: ExpectedRestartRecoveryTarget;
@@ -98,6 +183,7 @@ export async function recoverStore(params: {
   cfg?: OpenClawConfig;
   observationOnly?: boolean;
   onExhaustedTarget?: (target: ExhaustedRestartRecoveryTarget) => void;
+  stateDir?: string;
   storePath: string;
   resumedSessionKeys: Set<string>;
   expectedClaim?: ExpectedRestartRecoveryClaim;
@@ -266,6 +352,21 @@ export async function recoverStore(params: {
     }
     if (params.observationOnly) {
       result.skipped++;
+      continue;
+    }
+    const pendingFinalAction = resolvePendingFinalRecoveryAction(entry, params.stateDir);
+    if (pendingFinalAction === "defer") {
+      result.skipped++;
+      continue;
+    }
+    if (pendingFinalAction === "complete" || pendingFinalAction === "notice") {
+      const completed = await completePendingFinalRecovery(
+        entry,
+        sessionKey,
+        params.storePath,
+        pendingFinalAction === "notice",
+      );
+      result[completed ? "recovered" : "skipped"]++;
       continue;
     }
     const recordResumeResult = (resumeResult: Awaited<ReturnType<typeof resumeMainSession>>) => {

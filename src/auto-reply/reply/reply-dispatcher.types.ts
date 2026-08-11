@@ -13,6 +13,10 @@ export type ReplyFollowupAdmissionBarrierTimeoutPolicy = {
 export type ReplyDispatchRuntimeInfo = {
   kind: ReplyDispatchKind;
   assistantMessageIndex?: number;
+  /** @internal Rebinds WeakMap-only pending-final custody after a provider clones a payload. */
+  bindPendingFinalDelivery?: <T extends ReplyPayload>(payload: T) => T;
+  /** @internal Records ambiguous custody immediately before recipient-visible platform I/O. */
+  onPlatformSendDispatch?: () => Promise<void>;
 };
 
 export type ReplyDispatchBeforeDeliver = (

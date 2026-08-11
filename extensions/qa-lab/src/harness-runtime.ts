@@ -107,7 +107,10 @@ export function createQaRunnerRuntime(): PluginRuntime {
             cfg: params.cfg,
             dispatcherOptions: {
               deliver: async (payload, info) => {
-                await delivery(payload, info);
+                await delivery(payload, {
+                  ...info,
+                  onPlatformSendDispatch: info.onPlatformSendDispatch ?? (async () => {}),
+                });
               },
               onError: params.delivery.onError,
             },

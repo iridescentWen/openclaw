@@ -156,6 +156,24 @@ describe("deliverDiscordReply", () => {
     expect(sendOptions.allowedMentions).toEqual({ parse: [] });
   });
 
+  it("leaves durable custody to the serialized batch owner", async () => {
+    const onPlatformSendDispatch = vi.fn(async () => {});
+
+    await deliverDiscordReply({
+      replies: [{ text: "shared path" }],
+      target: "channel:101",
+      token: "token",
+      runtime,
+      cfg,
+      textLimit: 2000,
+      kind: "final",
+      onPlatformSendDispatch,
+    });
+
+    expect(firstDeliverParams()).not.toHaveProperty("onPlatformSendDispatch");
+    expect(onPlatformSendDispatch).not.toHaveBeenCalled();
+  });
+
   it("formats reasoning replies as visible Discord payloads before shared outbound", async () => {
     await deliverDiscordReply({
       replies: [{ text: "Because it helps", isReasoning: true }],

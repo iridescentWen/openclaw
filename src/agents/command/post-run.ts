@@ -1,17 +1,18 @@
-import { getReplyPayloadMetadata } from "../../auto-reply/reply-payload.js";
+import {
+  getReplyPayloadMetadata,
+  setReplyPayloadMetadata,
+} from "../../auto-reply/reply-payload.js";
 import type { CliDeps } from "../../cli/deps.types.js";
 import type { RestartRecoveryTerminalDeliveryEvidenceResult } from "../../config/sessions/restart-recovery-types.js";
 import type { SessionEntry } from "../../config/sessions/types.js";
 import { assertAgentRunLifecycleGenerationCurrent } from "../../infra/agent-events.js";
 import { formatErrorMessage } from "../../infra/errors.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
-import { isSubagentSessionKey } from "../../routing/session-key.js";
 import type { RuntimeEnv } from "../../runtime.js";
 import type { DeliveryContext } from "../../utils/delivery-context.shared.js";
 import {
   buildRestartRecoveryTerminalDeliveryEvidence,
   constrainRestartRecoveryDeliveryPayloads,
-  shouldPersistCurrentRunSessionCleanup,
 } from "../agent-command-restart-recovery.js";
 import { normalizeAgentRunTerminalDeliverySnapshot } from "../agent-run-terminal-delivery.js";
 import { isHeartbeatLifecycleRunKind } from "../bootstrap-mode.js";
@@ -26,7 +27,6 @@ import {
   loadDeliveryRuntime,
   loadSessionStoreRuntime,
 } from "./runtime-loaders.js";
-import { clearPendingFinalDelivery, persistSessionEntry } from "./session-helpers.js";
 import type { EmbeddedSessionState } from "./session-preparation.js";
 import type { AgentCommandOpts } from "./types.js";
 
@@ -290,6 +290,14 @@ export async function finalizeEmbeddedAgentCommand(params: {
         assertAgentRunLifecycleGenerationCurrent(lifecycleGeneration);
         sessionEntry = compactedSessionEntry;
         runOwnedSessionId = compactedSessionEntry?.sessionId ?? runOwnedSessionId;
+        for (const payload of payloads) {
+          const completion = getReplyPayloadMetadata(payload)?.pendingFinalDeliveryCompletion;
+          if (completion && completion.sessionId !== runOwnedSessionId) {
+            setReplyPayloadMetadata(payload, {
+              pendingFinalDeliveryCompletion: { ...completion, sessionId: runOwnedSessionId },
+            });
+          }
+        }
         publishSessionOwnership();
       } catch (error) {
         throwAgentRunRestartAbortReason(params.opts.abortSignal?.reason);
@@ -365,35 +373,6 @@ export async function finalizeEmbeddedAgentCommand(params: {
           }
         : deliveryParams,
     );
-
-    if (
-      sessionStore &&
-      sessionKey &&
-      !isSubagentSessionKey(sessionKey) &&
-      !params.suppressVisibleSessionEffects &&
-      !sessionReboundDuringRun
-    ) {
-      const entry = sessionStore[sessionKey] ?? sessionEntry;
-      if (!entry) {
-        throw new Error("Cannot clear pending delivery without a session entry");
-      }
-      // This command only creates replayable markers, so transport-only is stale from an earlier run.
-      const clearStaleTransportOnly =
-        params.opts.deliver === true &&
-        !pendingFinalDeliveryMarker.hasSendableFinalPayload &&
-        entry.pendingFinalDelivery?.kind === "transport-only";
-      if (deliveryResult?.deliverySucceeded === true || clearStaleTransportOnly) {
-        sessionEntry = await persistSessionEntry({
-          sessionStore,
-          sessionKey,
-          storePath,
-          initialEntry: entry,
-          entry: clearPendingFinalDelivery(entry, Date.now()),
-          shouldPersist: (current) =>
-            shouldPersistCurrentRunSessionCleanup(current, runOwnedSessionId),
-        });
-      }
-    }
 
     if (fallbackExhausted || lifecycle.resolveResultError(result, false)) {
       lifecycle.emitResultError(result, fallbackExhausted, terminal);

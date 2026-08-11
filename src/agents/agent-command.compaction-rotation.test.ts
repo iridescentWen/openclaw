@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { getReplyPayloadMetadata, type ReplyPayload } from "../auto-reply/reply-payload.js";
 import type { SessionEntry } from "../config/sessions.js";
 import { formatSqliteSessionFileMarker } from "../config/sessions/legacy-sqlite-marker.js";
 import {
@@ -12,6 +13,7 @@ import {
 } from "../config/sessions/session-accessor.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { rotateAgentEventLifecycleGeneration } from "../infra/agent-events.js";
+import { settlePendingFinalDelivery } from "../infra/outbound/delivery-completion.js";
 import type { runAgentAttempt } from "./command/attempt-execution.runtime.js";
 import type { EmbeddedAgentRunResult } from "./embedded-agent.js";
 import type { loadManifestModelCatalog } from "./model-catalog.js";
@@ -212,9 +214,19 @@ beforeEach(async () => {
   state.deliveryFreshEntries = [];
   state.deliverAgentCommandResultMock.mockImplementation(
     async (params: {
+      payloads?: ReplyPayload[];
       resolveFreshSessionEntryForDelivery?: () => Promise<SessionEntry | undefined>;
     }) => {
       state.deliveryFreshEntries.push(await params.resolveFreshSessionEntryForDelivery?.());
+      const completions = new Map(
+        (params.payloads ?? []).flatMap((payload) => {
+          const completion = getReplyPayloadMetadata(payload)?.pendingFinalDeliveryCompletion;
+          return completion ? [[completion.deliveryId, completion] as const] : [];
+        }),
+      );
+      for (const completion of completions.values()) {
+        await settlePendingFinalDelivery({ kind: "pending-final", ...completion }, "delivered");
+      }
       return { deliverySucceeded: true };
     },
   );
@@ -828,7 +840,7 @@ describe("agentCommand compaction transcript rotation", () => {
     },
   );
 
-  it("skips post-turn compaction before delivering sendable finals that pending text cannot replay", async () => {
+  it("compacts a transport-only final after durable delivery ownership is recorded", async () => {
     const sessionId = "unrecoverable-media-before-compaction";
     const sessionKey = `agent:main:explicit:${sessionId}`;
     const payloads = [{ mediaUrl: "/tmp/reply.ogg", audioAsVoice: true }];
@@ -845,7 +857,7 @@ describe("agentCommand compaction transcript rotation", () => {
       deliver: true,
     });
 
-    expect(state.runCliTurnCompactionLifecycleMock).not.toHaveBeenCalled();
+    expect(state.runCliTurnCompactionLifecycleMock).toHaveBeenCalledOnce();
     expect(state.deliverAgentCommandResultMock).toHaveBeenCalledOnce();
     expect(state.deliverAgentCommandResultMock).toHaveBeenCalledWith(
       expect.objectContaining({ payloads }),

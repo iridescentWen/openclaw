@@ -142,7 +142,7 @@ export async function handleBuzzInbound(params: {
     },
     ctxPayload,
     delivery: {
-      deliver: async (payload) => {
+      deliver: async (payload, info) => {
         const text =
           payload && typeof payload === "object" && "text" in payload
             ? ((payload as { text?: string }).text ?? "")
@@ -150,6 +150,7 @@ export async function handleBuzzInbound(params: {
         if (!text.trim()) {
           return;
         }
+        await info.onPlatformSendDispatch();
         await bus.sendText({
           channelId,
           text,

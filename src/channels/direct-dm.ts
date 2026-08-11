@@ -54,7 +54,10 @@ type DispatchInboundDirectDmParams = {
   originatingChannel?: string;
   originatingTo?: string;
   extraContext?: Record<string, unknown>;
-  deliver: (payload: OutboundReplyPayload) => Promise<void>;
+  deliver: (
+    payload: OutboundReplyPayload,
+    info: { onPlatformSendDispatch: () => Promise<void> },
+  ) => Promise<void>;
   onRecordError: (err: unknown) => void;
   onDispatchError: (err: unknown, info: { kind: string }) => void;
 };
@@ -148,7 +151,10 @@ function buildDirectDmTurnPlan(
       onRecordError: params.onRecordError,
     },
     delivery: {
-      deliver: async (payload) => await params.deliver(normalizeOutboundReplyPayload(payload)),
+      deliver: async (payload, info) => {
+        const normalizedPayload = normalizeOutboundReplyPayload(payload);
+        return await params.deliver(normalizedPayload, info);
+      },
       onError: params.onDispatchError,
     },
     replyPipeline,

@@ -66,7 +66,18 @@ type PendingFinalDeliveryState = {
   createdAt: number;
   context?: DeliveryContext;
   intentId?: string;
+  deliveries?: Array<{
+    id: string;
+    state: "prepared" | "queued" | "delivered" | "suppressed" | "unknown";
+  }>;
 } & ({ kind: "replayable"; text: string } | { kind: "transport-only" });
+
+type PendingDeliveryNoticeState = {
+  createdAt: number;
+  context: DeliveryContext;
+  intentId: string;
+  state: "owed" | "unresolved";
+};
 
 /**
  * Durable transcript-repair record: an assistant final that was delivered to
@@ -522,6 +533,7 @@ type SessionEntryCore = SessionRestartRecoveryState &
     outputTokens?: number;
     totalTokens?: number;
     pendingFinalDelivery?: PendingFinalDeliveryState;
+    pendingDeliveryNotice?: PendingDeliveryNoticeState;
     /**
      * Ordered durable backlog of delivered assistant finals that failed to
      * reach the canonical transcript. Session admission restores each item

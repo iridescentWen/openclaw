@@ -94,6 +94,7 @@ export function createFeishuCommentReplyDispatcher(
       const acceptedChunks: string[] = [];
       for (const chunk of chunks) {
         try {
+          await info.onPlatformSendDispatch();
           const result = await deliverCommentThreadText(client, {
             file_token: params.fileToken,
             file_type: params.fileType,

@@ -281,7 +281,7 @@ export async function handleClickClackInbound(params: {
         ...activityReplyOptions,
       },
       delivery: {
-        deliver: async (payload) => {
+        deliver: async (payload, info) => {
           if (hasClickClackReplyMedia(payload)) {
             throw new Error("ClickClack media reply requires durable delivery");
           }
@@ -292,6 +292,7 @@ export async function handleClickClackInbound(params: {
           if (!text.trim()) {
             return;
           }
+          await info.onPlatformSendDispatch();
           await sendClickClackText({
             cfg: params.config,
             accountId: params.account.accountId,

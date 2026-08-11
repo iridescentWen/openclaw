@@ -651,7 +651,7 @@ async function processMessage(
       durable: () => ({
         to: normalizedTo,
       }),
-      deliver: async (payload) => {
+      deliver: async (payload, info) => {
         return await deliverZalouserReply({
           payload: payload as { text?: string; mediaUrls?: string[]; mediaUrl?: string },
           profile: account.profile,
@@ -662,6 +662,7 @@ async function processMessage(
           config,
           accountId: account.accountId,
           tableMode: "off",
+          onPlatformSendDispatch: info.onPlatformSendDispatch,
         });
       },
       onDelivered: (_payload, _info, result) => {
@@ -702,6 +703,7 @@ async function deliverZalouserReply(params: {
   config: OpenClawConfig;
   accountId?: string;
   tableMode?: MarkdownTableMode;
+  onPlatformSendDispatch: () => Promise<void>;
 }): Promise<{ visibleReplySent: boolean }> {
   const { payload, profile, chatId, isGroup, runtime, core, config, accountId } = params;
   const tableMode = params.tableMode ?? "code";
@@ -715,6 +717,7 @@ async function deliverZalouserReply(params: {
   });
   const accepted: Awaited<ReturnType<typeof sendMessageZalouser>>[] = [];
   const sendReplyPart = async (text: string, mediaUrl?: string) => {
+    await params.onPlatformSendDispatch();
     await sendMessageZalouser(chatId, text, {
       profile,
       ...(mediaUrl ? { mediaUrl } : {}),

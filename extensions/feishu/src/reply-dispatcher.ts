@@ -12,6 +12,7 @@ import {
   resolveChannelPreviewStreamMode,
   resolveChannelStreamingBlockEnabled,
 } from "openclaw/plugin-sdk/channel-outbound";
+import { PlatformMessageNotDispatchedError } from "openclaw/plugin-sdk/error-runtime";
 import { getGlobalHookRunner } from "openclaw/plugin-sdk/plugin-runtime";
 import {
   getReplyPayloadTtsSupplement,
@@ -334,10 +335,12 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
   let activeIdleSideEffectsPromise: Promise<void> | null = null;
   let idleRequestedForReply = false;
   let replyLifecycleStateInitialized = false;
+  let finalDeliveryCustody: (() => Promise<void>) | undefined;
   type PendingStreamingDelivery = {
     result: FeishuReplyDeliveryResult;
     infoKind?: string;
     streamingGeneration?: number;
+    onPlatformSendDispatch: () => Promise<void>;
     resolve: (result: FeishuReplyDeliveryResult) => void;
     reject: (error: unknown) => void;
   };
@@ -662,6 +665,7 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
     result: FeishuReplyDeliveryResult,
     infoKind?: string,
     ownerGeneration?: number,
+    onPlatformSendDispatch?: () => Promise<void>,
   ): FeishuReplyDeliveryResultWithFinalization => {
     let resolveFinalization!: (result: FeishuReplyDeliveryResult) => void;
     let rejectFinalization!: (error: unknown) => void;
@@ -673,6 +677,7 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
       result,
       ...(infoKind ? { infoKind } : {}),
       ...(ownerGeneration === undefined ? {} : { streamingGeneration: ownerGeneration }),
+      onPlatformSendDispatch: onPlatformSendDispatch ?? (async () => {}),
       resolve: resolveFinalization,
       reject: rejectFinalization,
     });
@@ -794,6 +799,7 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
   const sendMediaReplies = async (
     payload: ReplyPayload,
     options?: { fallbackText?: string },
+    onPlatformSendDispatch?: () => Promise<void>,
   ): Promise<FeishuReplyDeliveryResult> => {
     const mediaUrls = resolveSendableOutboundReplyParts(payload).mediaUrls;
     let sentFallbackText = false;
@@ -805,8 +811,9 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
         useCard: false,
         infoKind: "final",
         chunkMentions: requiredMentionTargets,
-        sendChunk: async ({ chunk, mentions }) =>
-          await sendMessageFeishu({
+        sendChunk: async ({ chunk, mentions }) => {
+          await onPlatformSendDispatch?.();
+          return await sendMessageFeishu({
             cfg,
             to: sendTarget,
             text: chunk,
@@ -815,13 +822,15 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
             allowTopLevelReplyFallback,
             accountId,
             ...(mentions ? { mentions } : {}),
-          }),
+          });
+        },
       });
     try {
       await sendMediaWithLeadingCaption({
         mediaUrls,
         caption: "",
         send: async ({ mediaUrl }) => {
+          await onPlatformSendDispatch?.();
           const result = await sendMediaFeishu({
             cfg,
             to: sendTarget,
@@ -848,6 +857,9 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
           options?.fallbackText === undefined
             ? undefined
             : async ({ error, mediaUrl }) => {
+                if (error instanceof PlatformMessageNotDispatchedError) {
+                  throw error;
+                }
                 if (isChannelPartialDeliveryError(error)) {
                   // The attachment is already visible; text recovery would duplicate delivery.
                   markVisibleReplySent();
@@ -889,6 +901,7 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
       );
       return false;
     }
+    await finalDeliveryCustody?.();
     await sendMessageFeishu({
       cfg,
       to: sendTarget,
@@ -952,12 +965,14 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
     result: FeishuReplyDeliveryResult | undefined,
     content: string | undefined,
     infoKind?: string,
+    onPlatformSendDispatch?: () => Promise<void>,
   ): Promise<FeishuReplyDeliveryResult | undefined> => {
     if (result?.visibleReplySent === true || !content?.trim()) {
       return result;
     }
     const cardHeader = resolveCardHeader(agentId, identity);
     const cardNote = resolveCardNote(agentId, identity, prefixContext.prefixContext);
+    await onPlatformSendDispatch?.();
     return await sendChunkedTextReply({
       text: content,
       useCard: true,
@@ -1015,8 +1030,13 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
                 providerFinalized,
                 completion.result.content,
                 completion.infoKind,
+                completion.onPlatformSendDispatch,
               );
             } catch (fallbackError: unknown) {
+              if (fallbackError instanceof PlatformMessageNotDispatchedError) {
+                completion.reject(fallbackError);
+                continue;
+              }
               const fallbackPartial = isChannelPartialDeliveryError(fallbackError)
                 ? fallbackError.deliveryResult
                 : undefined;
@@ -1099,6 +1119,7 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
     content: string;
     infoKind?: string;
     ownerGeneration?: number;
+    onPlatformSendDispatch: () => Promise<void>;
   }): Promise<never> => {
     let finalized = noVisibleFeishuReplyDelivery;
     let finalizationError: unknown;
@@ -1135,8 +1156,12 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
           finalized,
           paramsLocal.content,
           paramsLocal.infoKind,
+          paramsLocal.onPlatformSendDispatch,
         )) ?? finalized;
     } catch (fallbackError: unknown) {
+      if (fallbackError instanceof PlatformMessageNotDispatchedError) {
+        throw fallbackError;
+      }
       fallbackPartial = isChannelPartialDeliveryError(fallbackError)
         ? fallbackError.deliveryResult
         : undefined;
@@ -1215,6 +1240,7 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
         skippedFinalReason = null;
         skippedFinalAssistantMessageIndex = undefined;
         preparedDeliveryAssistantMessageIndex = undefined;
+        finalDeliveryCustody = undefined;
       }
       if (previewStreamingEnabled && renderMode === "card") {
         startStreaming();
@@ -1244,6 +1270,9 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
   const delivery: ChannelInboundTurnPlan["delivery"] = {
     observeMessageSent: true,
     deliver: async (payload: ReplyPayload, info) => {
+      if (info.kind === "final") {
+        finalDeliveryCustody = info.onPlatformSendDispatch;
+      }
       // Core serializes before-delivery hooks and delivery, even when a later hook replaces
       // the payload, so consume the prepared index before another reply can overwrite it.
       const deliveryAssistantMessageIndex = preparedDeliveryAssistantMessageIndex;
@@ -1326,7 +1355,9 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
         mediaOptions?: { fallbackText?: string },
       ): Promise<void> => {
         try {
-          deliveredResults.push(await sendMediaReplies(mediaPayload, mediaOptions));
+          deliveredResults.push(
+            await sendMediaReplies(mediaPayload, mediaOptions, info.onPlatformSendDispatch),
+          );
         } catch (error: unknown) {
           const partial = isChannelPartialDeliveryError(error) ? error.deliveryResult : undefined;
           const accumulated = mergeFeishuReplyDeliveryResults([
@@ -1362,8 +1393,9 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
                   infoKind: "block",
                   firstChunkMentions,
                   chunkMentions: requiredMentionTargets,
-                  sendChunk: async ({ chunk, mentions }) =>
-                    await sendMessageFeishu({
+                  sendChunk: async ({ chunk, mentions }) => {
+                    await info.onPlatformSendDispatch();
+                    return await sendMessageFeishu({
                       cfg,
                       to: sendTarget,
                       text: chunk,
@@ -1372,7 +1404,8 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
                       allowTopLevelReplyFallback,
                       accountId,
                       ...(mentions ? { mentions } : {}),
-                    }),
+                    });
+                  },
                 }),
               );
               sentIndependentBlockText = true;
@@ -1389,6 +1422,7 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
         }
 
         if (info?.kind === "final" && useStreamingCard) {
+          await info.onPlatformSendDispatch();
           startStreaming();
           if (streamingStartPromise) {
             await streamingStartPromise;
@@ -1406,6 +1440,7 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
           ownerGeneration !== undefined &&
           (streaming?.isActive() || matchingInFlightClose !== undefined)
         ) {
+          await info.onPlatformSendDispatch();
           if (activeStreamingGeneration !== undefined) {
             if (info?.kind === "block") {
               // Some runtimes emit block payloads without onPartial/final callbacks.
@@ -1432,6 +1467,7 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
                 content: text,
                 infoKind: info?.kind,
                 ownerGeneration,
+                onPlatformSendDispatch: info.onPlatformSendDispatch,
               });
             }
           }
@@ -1439,6 +1475,7 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
             mergeFeishuReplyDeliveryResults(deliveredResults, text),
             info?.kind,
             ownerGeneration,
+            info.onPlatformSendDispatch,
           );
         }
 
@@ -1451,8 +1488,9 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
               useCard: true,
               infoKind: info?.kind,
               chunkMentions: requiredMentionTargets,
-              sendChunk: async ({ chunk, mentions }) =>
-                await sendStructuredCardFeishu({
+              sendChunk: async ({ chunk, mentions }) => {
+                await info.onPlatformSendDispatch();
+                return await sendStructuredCardFeishu({
                   cfg,
                   to: sendTarget,
                   text: chunk,
@@ -1463,7 +1501,8 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
                   header: cardHeader,
                   note: cardNote,
                   ...(mentions ? { mentions } : {}),
-                }),
+                });
+              },
             }),
           );
         } else {
@@ -1476,8 +1515,9 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
               infoKind: info?.kind,
               firstChunkMentions,
               chunkMentions: requiredMentionTargets,
-              sendChunk: async ({ chunk, mentions }) =>
-                await sendMessageFeishu({
+              sendChunk: async ({ chunk, mentions }) => {
+                await info.onPlatformSendDispatch();
+                return await sendMessageFeishu({
                   cfg,
                   to: sendTarget,
                   text: chunk,
@@ -1486,7 +1526,8 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
                   allowTopLevelReplyFallback,
                   accountId,
                   ...(mentions ? { mentions } : {}),
-                }),
+                });
+              },
             }),
           );
         }

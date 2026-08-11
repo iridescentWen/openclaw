@@ -4,18 +4,27 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadSessionEntry, replaceSessionEntry } from "../../config/sessions/session-accessor.js";
 import type { InternalSessionEntry as SessionEntry } from "../../config/sessions/types.js";
-import type { ReplyPayload } from "../reply-payload.js";
-import {
-  capturePendingFinalDeliveryIdentity,
-  clearPendingFinalDeliveryAfterSuccess,
-  reconcilePendingFinalDeliveryAfterSettlement,
-} from "./dispatch-from-config.pending-final.js";
+import { settlePendingFinalDelivery } from "../../infra/outbound/delivery-completion.js";
 import { retireTerminalRestartRecoverySourceClaim } from "./restart-recovery-claim.js";
 
 describe("pending final delivery restart proof", () => {
   let tmpDir: string;
   let storePath: string;
   const sessionKey = "agent:main:discord:direct:123";
+  const context = { channel: "discord", to: "discord:dm:123", accountId: "main" };
+
+  function completion(deliveryId = "delivery-1", intentId = "intent-1") {
+    return {
+      kind: "pending-final" as const,
+      context,
+      createdAt: 1,
+      deliveryId,
+      intentId,
+      sessionId: "session",
+      sessionKey,
+      storePath,
+    };
+  }
 
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-pending-final-"));
@@ -40,6 +49,8 @@ describe("pending final delivery restart proof", () => {
         text: "hook reply",
         createdAt: 1,
         intentId: "intent-1",
+        deliveries: [{ id: "delivery-1", state: "prepared" }],
+        context,
       },
       restartRecoveryBeforeAgentReplyState: beforeAgentReplyState,
       restartRecoveryForceSafeTools: beforeAgentReplyState === "handled-reply" ? true : undefined,
@@ -52,13 +63,7 @@ describe("pending final delivery restart proof", () => {
     "clears %s provenance only after the exact pending intent succeeds",
     async (beforeAgentReplyState) => {
       await writePendingFinal(beforeAgentReplyState);
-      const identity = capturePendingFinalDeliveryIdentity({
-        intentId: "intent-1",
-        sessionKey,
-        storePath,
-      });
-
-      await clearPendingFinalDeliveryAfterSuccess({ identity, sessionKey, storePath });
+      await settlePendingFinalDelivery(completion(), "delivered");
 
       const entry = loadSessionEntry({ sessionKey, storePath }) as SessionEntry | undefined;
       expect(entry?.pendingFinalDelivery).toBeUndefined();
@@ -87,18 +92,14 @@ describe("pending final delivery restart proof", () => {
         kind: "transport-only",
         createdAt: Date.now(),
         intentId: "intent-media",
+        context,
+        deliveries: [{ id: "delivery-media", state: "prepared" }],
       },
       restartRecoveryBeforeAgentReplyState: "handled-unrecoverable",
       restartRecoverySourceIngress: "channel",
     };
     await replaceSessionEntry({ storePath, sessionKey }, entry);
-    const identity = capturePendingFinalDeliveryIdentity({
-      intentId: "intent-media",
-      sessionKey,
-      storePath,
-    });
-
-    await clearPendingFinalDeliveryAfterSuccess({ identity, sessionKey, storePath });
+    await settlePendingFinalDelivery(completion("delivery-media", "intent-media"), "delivered");
 
     expect(loadSessionEntry({ sessionKey, storePath })).toMatchObject({
       status: "done",
@@ -109,32 +110,19 @@ describe("pending final delivery restart proof", () => {
     ).toBeUndefined();
   });
 
-  it("keeps normal-turn provenance when transport fails before delivery", async () => {
+  it("turns an ambiguous terminal result into retained notice debt", async () => {
     await writePendingFinal("continue");
-    const identity = capturePendingFinalDeliveryIdentity({
-      intentId: "intent-1",
-      sessionKey,
-      storePath,
-    });
-    const payload: ReplyPayload = { text: "hook reply" };
 
-    await reconcilePendingFinalDeliveryAfterSettlement({
-      deliveries: [{ outcome: "failed-before-deliver", payload }],
-      identity,
-      replies: [payload],
-      sessionKey,
-      storePath,
-    });
+    await settlePendingFinalDelivery(completion(), "unknown");
 
-    expect(loadSessionEntry({ sessionKey, storePath })).toMatchObject({
-      pendingFinalDelivery: {
-        kind: "replayable",
-        text: "hook reply",
+    const entry = loadSessionEntry({ sessionKey, storePath });
+    expect(entry).toMatchObject({
+      pendingDeliveryNotice: {
         intentId: "intent-1",
+        state: "owed",
       },
-      restartRecoveryBeforeAgentReplyState: "continue",
-      restartRecoverySourceIngress: "channel",
     });
+    expect(entry?.pendingFinalDelivery).toBeUndefined();
   });
 
   it("does not retire a source while its terminal provider outcome is unknown", async () => {

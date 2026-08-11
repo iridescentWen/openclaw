@@ -200,6 +200,7 @@ async function deliverIrcReply(params: {
   accountId: string;
   sendReply?: (target: string, text: string, replyToId?: string) => Promise<void>;
   statusSink?: (patch: { lastOutboundAt?: number }) => void;
+  onPlatformSendDispatch: () => Promise<void>;
 }) {
   await deliverFormattedTextWithAttachments({
     payload: {
@@ -207,6 +208,7 @@ async function deliverIrcReply(params: {
       text: sanitizeIrcAssistantText(params.payload.text ?? ""),
     },
     send: async ({ text, replyToId }) => {
+      await params.onPlatformSendDispatch();
       if (params.sendReply) {
         await params.sendReply(params.target, text, replyToId);
       } else {
@@ -368,6 +370,7 @@ export async function handleIrcInbound(params: {
           accountId: account.accountId,
           sendReply: params.sendReply,
           statusSink,
+          onPlatformSendDispatch: async () => {},
         });
       },
       onReplyError: (err) => {
@@ -503,7 +506,7 @@ export async function handleIrcInbound(params: {
     route: { agentId: route.agentId, sessionKey: route.sessionKey },
     ctxPayload,
     delivery: {
-      deliver: async (payload) => {
+      deliver: async (payload, info) => {
         await deliverIrcReply({
           payload,
           cfg: config,
@@ -511,6 +514,7 @@ export async function handleIrcInbound(params: {
           accountId: account.accountId,
           sendReply: params.sendReply,
           statusSink,
+          onPlatformSendDispatch: info.onPlatformSendDispatch,
         });
       },
       onError: (err, info) => {

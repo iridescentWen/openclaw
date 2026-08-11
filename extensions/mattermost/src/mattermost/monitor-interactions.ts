@@ -123,7 +123,7 @@ export function registerMattermostInteractions(params: {
           ctxPayload,
           delivery: {
             observeMessageSent: true,
-            deliver: async (payload: ReplyPayload) => {
+            deliver: async (payload: ReplyPayload, info) => {
               const result = await deliverMattermostReplyPayload({
                 core,
                 cfg,
@@ -142,6 +142,7 @@ export function registerMattermostInteractions(params: {
                 tableMode,
                 sendMessage: sendMessageMattermost,
                 onDmChannelResolution: deliveryBarrier.trackDmChannelResolution,
+                onPlatformSendDispatch: info.onPlatformSendDispatch,
               });
               if (result.visibleReplySent) {
                 runtime.log?.(`delivered button-click reply to ${to}`);

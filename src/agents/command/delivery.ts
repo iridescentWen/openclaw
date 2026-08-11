@@ -9,6 +9,7 @@ import {
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import { copyReplyPayloadMetadata, type ReplyPayload } from "../../auto-reply/reply-payload.js";
 import { normalizeReplyPayload } from "../../auto-reply/reply/normalize-reply.js";
+import { resolvePendingFinalDeliveryCompletion } from "../../auto-reply/reply/pending-final-delivery.js";
 import { createReplyMediaPathNormalizer } from "../../auto-reply/reply/reply-media-paths.runtime.js";
 import { formatBtwTextForExternalDelivery } from "../../auto-reply/reply/reply-payloads-base.js";
 import {
@@ -35,6 +36,7 @@ import {
   resolveAgentOutboundTarget,
 } from "../../infra/outbound/agent-delivery.js";
 import { resolveMessageChannelSelection } from "../../infra/outbound/channel-selection.js";
+import { claimPreparedPendingFinalDelivery } from "../../infra/outbound/delivery-completion.js";
 import { buildOutboundResultEnvelope } from "../../infra/outbound/envelope.js";
 import {
   createOutboundPayloadPlan,
@@ -885,7 +887,17 @@ export async function deliverAgentCommandResult(
   }
 
   const deliveryPayloads = projectOutboundPayloadPlanForOutbound(outboundPayloadPlan);
+  const sourcePendingFinalCompletion = resolvePendingFinalDeliveryCompletion(
+    mediaNormalizedReplyPayloads,
+  );
+  if (sourcePendingFinalCompletion && !resolvePendingFinalDeliveryCompletion(deliveryPayloads)) {
+    throw new Error("pending final delivery completion was lost during outbound projection");
+  }
   if (deliveryPayloads.length === 0) {
+    const pendingFinalCompletion = sourcePendingFinalCompletion;
+    if (deliver && pendingFinalCompletion) {
+      await claimPreparedPendingFinalDelivery(pendingFinalCompletion, "suppressed");
+    }
     deliveryStatus = deliver ? (deliveryStatus ?? noVisiblePayloadStatus()) : undefined;
     const deliverySucceeded = deliveryStatus?.succeeded === true ? true : undefined;
     emitJsonEnvelope(deliveryStatus);

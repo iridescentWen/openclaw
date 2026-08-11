@@ -608,7 +608,7 @@ export async function monitorTlonProvider(opts: MonitorTlonOpts = {}): Promise<v
               threadId: parentId ?? undefined,
             })
           : false,
-        deliver: async (payload: ReplyPayload) => {
+        deliver: async (payload: ReplyPayload, info) => {
           const replyText = payload.text;
           if (!replyText) {
             return { visibleReplySent: false };
@@ -619,6 +619,7 @@ export async function monitorTlonProvider(opts: MonitorTlonOpts = {}): Promise<v
             if (!parsed) {
               return { visibleReplySent: false };
             }
+            await info.onPlatformSendDispatch();
             await sendGroupMessage({
               api,
               fromShip: botShipName,
@@ -630,6 +631,7 @@ export async function monitorTlonProvider(opts: MonitorTlonOpts = {}): Promise<v
             return { visibleReplySent: true, replyToId: parentId ?? undefined };
           }
 
+          await info.onPlatformSendDispatch();
           await sendDm({
             api,
             fromShip: botShipName,

@@ -319,23 +319,39 @@ export async function executePreparedReplyAgentRun(
           });
           if (!sourceReplyPolicy.suppressDelivery) {
             const pendingFinalDeliveryIntentId = crypto.randomUUID();
+            const pendingFinalDeliveryDeliveryId = crypto.randomUUID();
+            const pendingFinalDeliveryCreatedAt = Date.now();
+            const pendingFinalDeliveryContext = resolveReplyRunDeliveryContext({
+              cfg,
+              sessionCtx,
+              sessionEntry: activeSessionEntry,
+              sessionKey,
+              runtimePolicySessionKey,
+              opts,
+            });
+            if (!pendingFinalDeliveryContext) {
+              await checkpointBeforeAgentReply(hookCheckpoint);
+              return { ...hookResult, reply: hookReply };
+            }
             setReplyPayloadMetadata(hookReply, {
-              pendingFinalDeliveryIntentId,
-              pendingFinalDeliveryRetryText: hookFinalDeliveryText,
+              pendingFinalDeliveryCompletion: {
+                context: pendingFinalDeliveryContext,
+                createdAt: pendingFinalDeliveryCreatedAt,
+                deliveryId: pendingFinalDeliveryDeliveryId,
+                intentId: pendingFinalDeliveryIntentId,
+                sessionId: replyOperation.sessionId,
+                sessionKey,
+                storePath,
+              },
             });
             hookCheckpoint = {
               state: hookFinalDeliveryText ? "handled-reply" : "handled-unrecoverable",
               pendingFinalDelivery: {
                 text: hookFinalDeliveryText ?? "",
+                createdAt: pendingFinalDeliveryCreatedAt,
                 intentId: pendingFinalDeliveryIntentId,
-                context: resolveReplyRunDeliveryContext({
-                  cfg,
-                  sessionCtx,
-                  sessionEntry: activeSessionEntry,
-                  sessionKey,
-                  runtimePolicySessionKey,
-                  opts,
-                }),
+                deliveries: [{ id: pendingFinalDeliveryDeliveryId, state: "prepared" }],
+                context: pendingFinalDeliveryContext,
               },
             };
           } else {

@@ -222,7 +222,7 @@ export async function monitorLineProvider(
                     replyToken,
                     replyTokenUsed,
                   }),
-                deliver: async (payload) => {
+                deliver: async (payload, info) => {
                   const lineData = (payload.channelData?.line as LineChannelData | undefined) ?? {};
 
                   if (ctx.userId && !ctx.isGroup) {
@@ -257,6 +257,7 @@ export async function monitorLineProvider(
                         );
                       },
                     },
+                    onPlatformSendDispatch: info.onPlatformSendDispatch,
                   });
                   replyTokenUsed = deliveryResult.replyTokenUsed;
 

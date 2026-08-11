@@ -33,6 +33,7 @@ export async function deliverIMessageReply(params: {
   maxBytes: number;
   textLimit: number;
   sentMessageCache?: Pick<SentMessageCache, "remember">;
+  onPlatformSendDispatch?: () => Promise<void>;
 }) {
   const { payload, target, runtime, maxBytes, textLimit, accountId, sentMessageCache } = params;
   const scope = `${accountId ?? ""}:${target}`;
@@ -49,6 +50,7 @@ export async function deliverIMessageReply(params: {
   });
   const accepted: Awaited<ReturnType<typeof sendMessageIMessage>>[] = [];
   const sendAccepted = async (text: string, mediaUrl?: string) => {
+    await params.onPlatformSendDispatch?.();
     const sent = await sendMessageIMessage(target, text, {
       config: cfg,
       ...(mediaUrl ? { mediaUrl, ...(payload.audioAsVoice ? { audioAsVoice: true } : {}) } : {}),

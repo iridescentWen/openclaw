@@ -887,7 +887,7 @@ async function handleSlashCommandAsync(params: {
     ctxPayload,
     delivery: {
       observeMessageSent: true,
-      deliver: async (payload) => {
+      deliver: async (payload, info) => {
         const result = await deliverMattermostReplyPayload({
           core,
           cfg,
@@ -899,6 +899,7 @@ async function handleSlashCommandAsync(params: {
           tableMode,
           sendMessage: sendMessageMattermost,
           onDmChannelResolution: deliveryBarrier.trackDmChannelResolution,
+          onPlatformSendDispatch: info.onPlatformSendDispatch,
         });
         if (result.visibleReplySent) {
           runtime.log?.(`delivered slash reply to ${to}`);

@@ -201,7 +201,7 @@ export const startNostrGatewayAccount: NostrGatewayStart = async (ctx) => {
               : undefined,
             turnAdoptionLifecycle:
               bindIngressLifecycleToReplyOptions(lifecycle).turnAdoptionLifecycle,
-            deliver: async (payload) => {
+            deliver: async (payload, info) => {
               const outboundText =
                 payload && typeof payload === "object" && "text" in payload
                   ? ((payload as { text?: string }).text ?? "")
@@ -221,6 +221,7 @@ export const startNostrGatewayAccount: NostrGatewayStart = async (ctx) => {
                 runtime.channel.text.convertMarkdownTables(sanitizedText, tableMode),
               );
               if (message) {
+                await info.onPlatformSendDispatch();
                 await reply(message);
               }
             },

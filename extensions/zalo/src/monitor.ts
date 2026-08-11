@@ -726,7 +726,7 @@ async function processMessageWithPipeline(params: ZaloMessagePipelineParams): Pr
           infoKind: info.kind,
           chatId,
         }),
-      deliver: async (payload) => {
+      deliver: async (payload, info) => {
         await deliverZaloReply({
           payload,
           token,
@@ -742,6 +742,7 @@ async function processMessageWithPipeline(params: ZaloMessagePipelineParams): Pr
           statusSink,
           fetcher,
           tableMode: "off",
+          onPlatformSendDispatch: info.onPlatformSendDispatch,
         });
       },
       onDelivered: (_payload, _info, result) => {
@@ -780,6 +781,7 @@ async function deliverZaloReply(params: {
   statusSink?: ZaloStatusSink;
   fetcher?: ZaloFetch;
   tableMode?: MarkdownTableMode;
+  onPlatformSendDispatch: () => Promise<void>;
 }): Promise<void> {
   const {
     payload,
@@ -818,6 +820,7 @@ async function deliverZaloReply(params: {
       chunkText: (value) =>
         core.channel.text.chunkMarkdownTextWithMode(value, ZALO_TEXT_LIMIT, chunkMode),
       sendText: async (chunk) => {
+        await params.onPlatformSendDispatch();
         recordAcceptedSend(await sendMessage(token, { chat_id: chatId, text: chunk }, fetcher));
       },
       sendMedia: async ({ mediaUrl, caption }) => {
@@ -831,6 +834,7 @@ async function deliverZaloReply(params: {
                 proxyUrl,
               })
             : mediaUrl;
+        await params.onPlatformSendDispatch();
         recordAcceptedSend(
           await sendPhoto(token, { chat_id: chatId, photo: sendableMediaUrl, caption }, fetcher),
         );

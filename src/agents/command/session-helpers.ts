@@ -38,18 +38,6 @@ export async function persistSessionEntry(
   return await persistSessionEntryBase(params);
 }
 
-export function clearPendingFinalDelivery(entry: SessionEntry, updatedAt: number): SessionEntry {
-  return {
-    ...entry,
-    pendingFinalDelivery: undefined,
-    restartRecoveryForceSafeTools: undefined,
-    restartRecoveryDeliveryMediaUrls: undefined,
-    restartRecoveryDisableMessageTool: undefined,
-    restartRecoverySuppressTextDelivery: undefined,
-    updatedAt,
-  };
-}
-
 type PreparedCurrentRunDelivery = {
   context: DeliveryContext;
   targetMode: ChannelOutboundTargetMode;

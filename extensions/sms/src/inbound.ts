@@ -268,11 +268,12 @@ export async function dispatchSmsInboundEvent(params: {
               durable: () => ({
                 to: from,
               }),
-              deliver: async (payload) => {
+              deliver: async (payload, info) => {
                 const text = payload.text;
                 if (!text) {
                   return { visibleReplySent: false };
                 }
+                await info.onPlatformSendDispatch();
                 await sendSmsTextChunks({
                   account: params.account,
                   to: from,

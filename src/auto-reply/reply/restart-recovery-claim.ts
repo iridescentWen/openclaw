@@ -13,6 +13,7 @@ import type {
 } from "../../config/sessions/session-transcript-turn-lifecycle.types.js";
 import { sessionMatchesExpectedTranscriptTurn } from "../../config/sessions/session-transcript-turn-state.js";
 import type { InternalSessionEntry as SessionEntry } from "../../config/sessions/types.js";
+import { buildPendingFinalDeliveryInstallPatch } from "../../infra/outbound/delivery-completion.js";
 import type {
   UserTurnTranscriptRecorder,
   UserTurnTranscriptTarget,
@@ -29,6 +30,11 @@ type ReplyRestartRecoveryClaimController = {
     state: Exclude<RestartRecoveryBeforeAgentReplyState, "admitted" | "pending">;
     pendingFinalDelivery?: {
       context?: DeliveryContext;
+      createdAt: number;
+      deliveries: Array<{
+        id: string;
+        state: "prepared";
+      }>;
       intentId: string;
       text: string;
     };
@@ -368,18 +374,19 @@ export function createReplyRestartRecoveryClaimController(params: {
                 restartRecoveryBeforeAgentReplyState: state,
                 ...(pendingFinalDelivery
                   ? {
-                      pendingFinalDelivery: {
+                      ...buildPendingFinalDeliveryInstallPatch(current, {
                         ...(pendingFinalDelivery.text
                           ? { kind: "replayable" as const, text: pendingFinalDelivery.text }
                           : { kind: "transport-only" as const }),
-                        createdAt: updatedAt,
+                        createdAt: pendingFinalDelivery.createdAt,
                         ...(pendingFinalDelivery.intentId
                           ? { intentId: pendingFinalDelivery.intentId }
                           : {}),
+                        deliveries: pendingFinalDelivery.deliveries,
                         ...(pendingFinalDelivery.context
                           ? { context: pendingFinalDelivery.context }
                           : {}),
-                      },
+                      }),
                       // Hook-owned replies are already terminal. A restart may only deliver this
                       // checkpoint; it must never resume the model or broader tool surface.
                       restartRecoveryForceSafeTools: true,

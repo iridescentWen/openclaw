@@ -83,7 +83,7 @@ export function createMattermostModelPickerInteractionHandler(
       delivery: {
         observeMessageSent: true,
         // Picker-triggered confirmations should stay immediate.
-        deliver: async (payload: ReplyPayload) => {
+        deliver: async (payload: ReplyPayload, info) => {
           const trimmedPayload = {
             ...payload,
             text: core.channel.text.convertMarkdownTables(payload.text ?? "", tableMode).trim(),
@@ -107,6 +107,7 @@ export function createMattermostModelPickerInteractionHandler(
             tableMode: "off",
             sendMessage: sendMessageMattermost,
             onDmChannelResolution: deliveryBarrier.trackDmChannelResolution,
+            onPlatformSendDispatch: info.onPlatformSendDispatch,
           });
         },
         onError: (err, info) => {

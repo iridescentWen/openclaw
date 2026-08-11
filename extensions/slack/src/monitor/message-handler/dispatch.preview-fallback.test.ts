@@ -1077,7 +1077,10 @@ vi.mock("openclaw/plugin-sdk/channel-inbound", async (importOriginal) => {
         }
         mockedQueuedDispatchCounts[entry.kind] += 1;
         try {
-          await params.delivery.deliver(deliverPayload, { kind: entry.kind });
+          await params.delivery.deliver(deliverPayload, {
+            kind: entry.kind,
+            onPlatformSendDispatch: async () => {},
+          });
         } catch (error) {
           if (!mockedDispatcherCapturesDeliveryErrors) {
             throw error;

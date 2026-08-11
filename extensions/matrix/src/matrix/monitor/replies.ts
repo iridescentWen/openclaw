@@ -121,6 +121,7 @@ export async function deliverMatrixReplies(params: {
   accountId?: string;
   mediaLocalRoots?: readonly string[];
   tableMode?: MarkdownTableMode;
+  onPlatformSendDispatch?: () => Promise<void>;
 }): Promise<MatrixReplyDeliveryResult> {
   const core = getMatrixRuntime();
   const tableMode =
@@ -195,6 +196,7 @@ export async function deliverMatrixReplies(params: {
             threadId: params.threadId,
             accountId: params.accountId,
             onDeliveryResult,
+            onPlatformSendDispatch: params.onPlatformSendDispatch,
           });
         }
         continue;
@@ -213,6 +215,7 @@ export async function deliverMatrixReplies(params: {
           audioAsVoice: reply.audioAsVoice,
           accountId: params.accountId,
           onDeliveryResult,
+          onPlatformSendDispatch: params.onPlatformSendDispatch,
         });
         first = false;
       }

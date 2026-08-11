@@ -121,6 +121,7 @@ export async function deliverLineAutoReply(params: {
   cfg: OpenClawConfig;
   textLimit: number;
   deps: LineAutoReplyDeps;
+  onPlatformSendDispatch?: () => Promise<void>;
 }): Promise<LineAutoReplyDeliveryResult> {
   const { payload, lineData, replyToken, accountId, to, textLimit, deps } = params;
   let replyTokenUsed = params.replyTokenUsed;
@@ -128,6 +129,7 @@ export async function deliverLineAutoReply(params: {
 
   const sendVisible = async <T>(send: () => Promise<T>): Promise<T> => {
     try {
+      await params.onPlatformSendDispatch?.();
       const result = await send();
       visibleReplySent = true;
       return result;

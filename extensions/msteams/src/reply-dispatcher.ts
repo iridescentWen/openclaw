@@ -227,6 +227,7 @@ export function createMSTeamsReplyDispatcher(params: {
     blockSettled: boolean;
     settled: boolean;
     errors: unknown[];
+    onPlatformSendDispatch: () => Promise<void>;
   };
 
   const pendingDeliveries: PendingDelivery[] = [];
@@ -343,6 +344,7 @@ export function createMSTeamsReplyDispatcher(params: {
     payload: ReplyPayload,
     messages: MSTeamsRenderedMessage[],
     native: boolean,
+    onPlatformSendDispatch: () => Promise<void>,
   ): PendingDelivery => {
     const finalization = createDeferred<DeliveryOutcome>();
     const delivery: PendingDelivery = {
@@ -355,6 +357,7 @@ export function createMSTeamsReplyDispatcher(params: {
       blockSettled: messages.length === 0,
       settled: false,
       errors: [],
+      onPlatformSendDispatch,
     };
     pendingDeliveries.push(delivery);
     return delivery;
@@ -372,6 +375,7 @@ export function createMSTeamsReplyDispatcher(params: {
       const sentIds: string[] = [];
       for (const msg of toSend) {
         try {
+          await delivery.onPlatformSendDispatch();
           const msgIds = await sendMessages([msg]);
           const validIds = msgIds.filter((id) => id.trim() && id !== "unknown");
           if (msgIds.length > 0) {
@@ -433,7 +437,10 @@ export function createMSTeamsReplyDispatcher(params: {
   };
   const delivery: ChannelInboundTurnPlan["delivery"] = {
     observeMessageSent: true,
-    deliver: async (payload) => {
+    deliver: async (payload, info) => {
+      if (streamController.finalPayloadEmitRequiresCustody(payload)) {
+        await info.onPlatformSendDispatch();
+      }
       const preparedPayload = streamController.preparePayload(payload);
       const native = streamController.claimNativeDelivery();
       const messages = preparedPayload ? renderReplyPayload(preparedPayload) : [];
@@ -444,7 +451,7 @@ export function createMSTeamsReplyDispatcher(params: {
         };
       }
 
-      const pending = queueReplyPayload(payload, messages, native);
+      const pending = queueReplyPayload(payload, messages, native, info.onPlatformSendDispatch);
 
       // When block streaming is enabled, flush immediately so blocks are
       // delivered progressively instead of batching until markDispatchIdle.
@@ -485,6 +492,7 @@ export function createMSTeamsReplyDispatcher(params: {
     }
     let nativeResult;
     try {
+      await nativeDelivery.onPlatformSendDispatch();
       nativeResult = await streamController.finalize();
     } catch (error) {
       nativeDelivery.errors.push(error);

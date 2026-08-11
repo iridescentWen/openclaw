@@ -323,6 +323,8 @@ export async function dispatchDiscordComponentEvent(params: {
               chunkMode: resolveChunkMode(ctx.cfg, "discord", accountId),
               mediaLocalRoots,
               kind: info.kind,
+              bindPendingFinalDelivery: info.bindPendingFinalDelivery,
+              onPlatformSendDispatch: info.onPlatformSendDispatch,
             });
             if (result.visibleReplySent) {
               replyReference.markSent();

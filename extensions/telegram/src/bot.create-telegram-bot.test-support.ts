@@ -71,15 +71,20 @@ export function createTelegramNativeCommandTestDeps(
 ): { dispatchChannelInboundTurn: DispatchChannelInboundTurn } {
   return {
     dispatchChannelInboundTurn: async (plan) => {
+      const deliver =
+        "deliverWithProviderMessageSending" in plan.delivery
+          ? plan.delivery.deliverWithProviderMessageSending
+          : plan.delivery.deliver;
       const dispatchResult = await dispatchReply({
         ctx: plan.ctxPayload,
         cfg: plan.cfg,
         dispatcherOptions: {
           ...plan.dispatcherOptions,
-          deliver:
-            "deliverWithProviderMessageSending" in plan.delivery
-              ? plan.delivery.deliverWithProviderMessageSending
-              : plan.delivery.deliver,
+          deliver: async (payload, info) =>
+            await deliver(payload, {
+              ...info,
+              onPlatformSendDispatch: info.onPlatformSendDispatch ?? (async () => {}),
+            }),
           onError: plan.delivery.onError,
         },
         replyOptions: plan.replyOptions,

@@ -440,7 +440,7 @@ async function processMessageWithPipeline(params: {
               spaceId,
               hasTypingMessage: Boolean(typingMessage),
             }),
-          deliver: async (payload) => {
+          deliver: async (payload, info) => {
             await deliverGoogleChatReply({
               payload,
               account,
@@ -450,6 +450,7 @@ async function processMessageWithPipeline(params: {
               config,
               statusSink,
               typingMessage,
+              onPlatformSendDispatch: info.onPlatformSendDispatch,
             });
             // Only use typing message for first delivery
             typingMessage = undefined;

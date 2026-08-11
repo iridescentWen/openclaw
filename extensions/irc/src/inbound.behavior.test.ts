@@ -262,15 +262,18 @@ describe("irc inbound behavior", () => {
     const dispatchReply = coreRuntime.channel.inbound.dispatchReply as unknown as ReturnType<
       typeof vi.fn<
         (params: {
-          delivery: { deliver: (payload: { text: string }) => Promise<void> };
+          delivery: {
+            deliver: (
+              payload: { text: string },
+              info: { onPlatformSendDispatch: () => Promise<void> },
+            ) => Promise<void>;
+          };
         }) => Promise<void>
       >
     >;
-    dispatchReply.mockImplementation(
-      async (params: { delivery: { deliver: (payload: { text: string }) => Promise<void> } }) => {
-        await params.delivery.deliver({ text: reply });
-      },
-    );
+    dispatchReply.mockImplementation(async (params) => {
+      await params.delivery.deliver({ text: reply }, { onPlatformSendDispatch: async () => {} });
+    });
     setIrcRuntime(coreRuntime as never);
 
     await handleIrcInbound({

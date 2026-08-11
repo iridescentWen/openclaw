@@ -2885,7 +2885,7 @@ describe("matrix monitor handler draft streaming", () => {
       isCompactionNotice?: boolean;
       replyToId?: string;
     },
-    info: { kind: string },
+    info: { kind: string; onPlatformSendDispatch?: () => Promise<void> },
   ) => Promise<unknown>;
   type ReplyOpts = {
     onReplyStart?: () => Promise<void> | void;
@@ -4061,9 +4061,10 @@ describe("matrix monitor handler draft streaming", () => {
     await finish();
   });
 
-  it("falls back to deliverMatrixReplies when final edit fails", async () => {
+  it("retains the draft when the final edit result is ambiguous", async () => {
     const { dispatch } = createStreamingHarness();
     const { deliver, opts, finish } = await dispatch();
+    const onPlatformSendDispatch = vi.fn(async () => {});
 
     opts.onPartialReply?.({ text: "Hello" });
     await waitForMatrixState(() => {
@@ -4072,9 +4073,10 @@ describe("matrix monitor handler draft streaming", () => {
 
     editMessageMatrixMock.mockRejectedValueOnce(new Error("rate limited"));
 
-    await deliver({ text: "Hello world" }, { kind: "block" });
+    await deliver({ text: "Hello world" }, { kind: "block", onPlatformSendDispatch });
 
-    expect(deliverMatrixRepliesMock).toHaveBeenCalledTimes(1);
+    expect(onPlatformSendDispatch).toHaveBeenCalledOnce();
+    expect(deliverMatrixRepliesMock).not.toHaveBeenCalled();
     await finish();
   });
 

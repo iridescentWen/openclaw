@@ -91,6 +91,7 @@ export async function deliverDiscordInteractionReply(params: {
   preferFollowUp: boolean;
   responseEphemeral?: boolean;
   chunkMode: "length" | "newline";
+  onPlatformSendDispatch?: () => Promise<void>;
 }): Promise<boolean> {
   const { interaction, payload, textLimit, maxLinesPerMessage, preferFollowUp, chunkMode } = params;
   const reply = resolveSendableOutboundReplyParts(payload);
@@ -130,6 +131,7 @@ export async function deliverDiscordInteractionReply(params: {
           };
     let result: void | null;
     try {
+      await params.onPlatformSendDispatch?.();
       result = await safeDiscordInteractionCall("interaction send", async () => {
         if (!preferFollowUp && !payloadDelivered) {
           await interaction.reply(payloadLocal);

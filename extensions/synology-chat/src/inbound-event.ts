@@ -1,6 +1,6 @@
 // Synology Chat plugin module implements inbound event behavior.
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-contracts";
-import { sendMessage } from "./client.js";
+import { PlatformMessageNotDispatchedError } from "openclaw/plugin-sdk/error-runtime";
 import type { SynologyInboundMessage } from "./inbound-context.js";
 import { getSynologyRuntime } from "./runtime.js";
 import { buildSynologyChatInboundSessionKey } from "./session-key.js";
@@ -38,24 +38,6 @@ function resolveSynologyChatInboundRoute(params: {
       identityLinks: params.cfg.session?.identityLinks,
     }),
   };
-}
-
-async function deliverSynologyChatReply(params: {
-  account: ResolvedSynologyChatAccount;
-  sendUserId: string;
-  payload: { text?: string; body?: string };
-}): Promise<{ visibleReplySent: boolean }> {
-  const text = params.payload.text ?? params.payload.body;
-  if (!text) {
-    return { visibleReplySent: false };
-  }
-  const ok = await sendMessage(
-    params.account.incomingUrl,
-    text,
-    params.sendUserId,
-    params.account.allowInsecureSsl,
-  );
-  return { visibleReplySent: ok };
 }
 
 export async function dispatchSynologyChatInboundEvent(params: {
@@ -145,12 +127,11 @@ export async function dispatchSynologyChatInboundEvent(params: {
             durable: () => ({
               to: sendUserId,
             }),
-            deliver: async (payload) => {
-              return await deliverSynologyChatReply({
-                account: params.account,
-                sendUserId,
-                payload,
-              });
+            deliver: async () => {
+              throw new PlatformMessageNotDispatchedError(
+                "Synology Chat durable reply delivery is unavailable",
+                { cause: new Error("durable adapter rejected this payload"), retryable: false },
+              );
             },
           },
           dispatcherOptions: {

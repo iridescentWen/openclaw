@@ -1,4 +1,7 @@
-import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
+import {
+  formatErrorMessage,
+  PlatformMessageNotDispatchedError,
+} from "openclaw/plugin-sdk/error-runtime";
 import { resolveSendableOutboundReplyParts } from "openclaw/plugin-sdk/reply-payload";
 import type { ReplyDispatchKind, ReplyPayload } from "openclaw/plugin-sdk/reply-runtime";
 import { danger, logVerbose } from "openclaw/plugin-sdk/runtime-env";
@@ -282,6 +285,7 @@ export function createSlackStreamingDeliveryRuntime(setup: SlackDispatchSetup) {
     payload: ReplyPayload;
     kind: ReplyDispatchKind;
     forcedThreadTs?: string;
+    onPlatformSendDispatch: () => Promise<void>;
   }): Promise<string | undefined> => {
     if (params.payload.isReasoning === true) {
       return undefined;
@@ -301,6 +305,7 @@ export function createSlackStreamingDeliveryRuntime(setup: SlackDispatchSetup) {
       logVerbose("slack: suppressed duplicate normal delivery within the same turn");
       return deliveryReplyThreadTs;
     }
+    await params.onPlatformSendDispatch();
     await deliverReplies({
       cfg: ctx.cfg,
       replies: [params.payload],
@@ -368,6 +373,7 @@ export function createSlackStreamingDeliveryRuntime(setup: SlackDispatchSetup) {
   const deliverWithStreaming = async (params: {
     payload: ReplyPayload;
     kind: ReplyDispatchKind;
+    onPlatformSendDispatch: () => Promise<void>;
   }): Promise<void> => {
     if (params.payload.isReasoning === true) {
       return;
@@ -388,6 +394,7 @@ export function createSlackStreamingDeliveryRuntime(setup: SlackDispatchSetup) {
         payload: params.payload,
         kind: params.kind,
         forcedThreadTs: state.streamSession?.threadTs ?? state.nativeProgressStreamThreadTs,
+        onPlatformSendDispatch: params.onPlatformSendDispatch,
       });
       return;
     }
@@ -403,6 +410,7 @@ export function createSlackStreamingDeliveryRuntime(setup: SlackDispatchSetup) {
           payload: params.payload,
           kind: params.kind,
           forcedThreadTs: state.streamSession?.threadTs ?? state.nativeProgressStreamThreadTs,
+          onPlatformSendDispatch: params.onPlatformSendDispatch,
         });
         return;
       }
@@ -417,6 +425,7 @@ export function createSlackStreamingDeliveryRuntime(setup: SlackDispatchSetup) {
           await deliverNormally({
             payload: params.payload,
             kind: params.kind,
+            onPlatformSendDispatch: params.onPlatformSendDispatch,
           });
           return;
         }
@@ -432,18 +441,20 @@ export function createSlackStreamingDeliveryRuntime(setup: SlackDispatchSetup) {
           return;
         }
 
+        const teamId = await resolveSlackStreamRecipientTeamId({
+          client: slackClient,
+          token: ctx.botToken,
+          userId: message.user,
+          fallbackTeamId: slackStreamFallbackTeamId,
+        });
+        await params.onPlatformSendDispatch();
         state.streamSession = await startSlackStream({
           client: slackClient,
           channel: message.channel,
           threadTs: streamThreadTs,
           text,
           ...(slackIdentity ? { identity: slackIdentity } : {}),
-          teamId: await resolveSlackStreamRecipientTeamId({
-            client: slackClient,
-            token: ctx.botToken,
-            userId: message.user,
-            fallbackTeamId: slackStreamFallbackTeamId,
-          }),
+          teamId,
           userId: message.user,
         });
         refreshStreamedAcknowledgements(state.streamSession);
@@ -490,6 +501,7 @@ export function createSlackStreamingDeliveryRuntime(setup: SlackDispatchSetup) {
         // Record first so a later successful stop can acknowledge a thrown append.
         recordStreamedDelivery(params.kind, text);
       }
+      await params.onPlatformSendDispatch();
       await appendSlackStream({
         session: state.streamSession,
         text: "\n" + text,
@@ -510,6 +522,9 @@ export function createSlackStreamingDeliveryRuntime(setup: SlackDispatchSetup) {
         textOverride: text,
       });
     } catch (err) {
+      if (err instanceof PlatformMessageNotDispatchedError) {
+        throw err;
+      }
       if (err instanceof SlackStreamNotDeliveredError) {
         state.streamFailed = true;
         if (state.streamSession) {
@@ -529,6 +544,7 @@ export function createSlackStreamingDeliveryRuntime(setup: SlackDispatchSetup) {
           payload: params.payload,
           kind: params.kind,
           forcedThreadTs: plannedThreadTs,
+          onPlatformSendDispatch: params.onPlatformSendDispatch,
         });
         return;
       }
@@ -564,6 +580,7 @@ export function createSlackStreamingDeliveryRuntime(setup: SlackDispatchSetup) {
         kind: params.kind,
         forcedThreadTs:
           state.streamSession?.threadTs ?? state.nativeProgressStreamThreadTs ?? plannedThreadTs,
+        onPlatformSendDispatch: params.onPlatformSendDispatch,
       });
     }
   };

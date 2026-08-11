@@ -1,5 +1,7 @@
 import type { SessionEntry } from "../../config/sessions/types.js";
+import type { DurableDeliveryCompletion } from "../../infra/outbound/delivery-completion.js";
 import { normalizeReplyPayloadsForDelivery } from "../../infra/outbound/payloads.js";
+import { getReplyPayloadMetadata } from "../reply-payload.js";
 import {
   isSilentReplyPayloadText,
   isSilentReplyText,
@@ -92,6 +94,15 @@ export function buildPendingFinalDeliveryText(payloads: ReplyPayload[]): string 
 export const PENDING_FINAL_DELIVERY_CLEAR_PATCH = {
   pendingFinalDelivery: undefined,
 } as const satisfies Partial<SessionEntry>;
+
+export function resolvePendingFinalDeliveryCompletion(
+  payloads: readonly ReplyPayload[] | undefined,
+): Extract<DurableDeliveryCompletion, { kind: "pending-final" }> | undefined {
+  const completion = payloads
+    ?.map((payload) => getReplyPayloadMetadata(payload)?.pendingFinalDeliveryCompletion)
+    .find(Boolean);
+  return completion ? { kind: "pending-final", ...completion } : undefined;
+}
 
 function collectDurableMediaDirectives(payload: ReplyPayload): string[] {
   if (payload.sensitiveMedia === true) {

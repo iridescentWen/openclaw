@@ -105,6 +105,8 @@ export function createTelegramReplyDelivery(params: {
     | {
         promise: Promise<{ visibleReplySent: boolean }>;
         visibleReplySent: boolean;
+        onPlatformSendDispatch?: () => Promise<void>;
+        bindPendingFinalDelivery?: <T extends ReplyPayload>(payload: T) => T;
         resolve: (result: { visibleReplySent: boolean }) => void;
         reject: (error: unknown) => void;
       }
@@ -144,6 +146,8 @@ export function createTelegramReplyDelivery(params: {
         buffered.payload,
         buffered.text,
         resolvePayloadTelegramInlineButtons(buffered.payload),
+        settlement?.onPlatformSendDispatch,
+        settlement?.bindPendingFinalDelivery,
       );
       if (settlement) {
         settlement.resolve({
@@ -271,6 +275,8 @@ export function createTelegramReplyDelivery(params: {
         bufferedFinalSettlement = {
           promise: finalization,
           visibleReplySent: blockDelivered,
+          onPlatformSendDispatch: info.onPlatformSendDispatch,
+          bindPendingFinalDelivery: info.bindPendingFinalDelivery,
           resolve: resolveFinalization,
           reject: rejectFinalization,
         };
@@ -381,6 +387,8 @@ export function createTelegramReplyDelivery(params: {
               effectivePayload,
               segment.update.text,
               telegramButtons,
+              info.onPlatformSendDispatch,
+              info.bindPendingFinalDelivery,
             )
           : await params.delivery.deliverLaneText({
               laneName: segment.lane,
@@ -389,6 +397,8 @@ export function createTelegramReplyDelivery(params: {
               infoKind: info.kind,
               buttons: telegramButtons,
               allowStream: !isDurableProgressCommentary,
+              onPlatformSendDispatch: info.onPlatformSendDispatch,
+              bindPendingFinalDelivery: info.bindPendingFinalDelivery,
             });
       if (
         segment.lane === "answer" &&
@@ -440,6 +450,8 @@ export function createTelegramReplyDelivery(params: {
             : effectivePayload;
         delivered = await params.delivery.sendPayload(payloadWithoutReasoning, {
           durable: info.kind === "final",
+          onPlatformSendDispatch: info.onPlatformSendDispatch,
+          bindPendingFinalDelivery: info.bindPendingFinalDelivery,
         });
       }
       if (info.kind === "final" && delivered) {
@@ -463,6 +475,8 @@ export function createTelegramReplyDelivery(params: {
     }
     const delivered = await params.delivery.sendPayload(effectivePayload, {
       durable: info.kind === "final",
+      onPlatformSendDispatch: info.onPlatformSendDispatch,
+      bindPendingFinalDelivery: info.bindPendingFinalDelivery,
     });
     if (info.kind === "final" && delivered) {
       params.progress.markFinalDelivered();

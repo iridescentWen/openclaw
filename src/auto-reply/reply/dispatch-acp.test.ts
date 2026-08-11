@@ -3009,7 +3009,7 @@ describe("tryDispatchAcpReplyCore", () => {
     expect(dispatcherCall(dispatcher.sendFinalReply).text).toBe("Visible.  Done.");
   });
 
-  it("falls back to Telegram ACP text when a routed captioned voice is suppressed", async () => {
+  it("does not retry suppressed caption content after routed TTS", async () => {
     setReadyAcpResolution();
     ttsCapabilityMocks.captionedFinalText = true;
     queueTtsReplies({
@@ -3020,9 +3020,7 @@ describe("tryDispatchAcpReplyCore", () => {
       ttsSupplement: { spokenText: "Visible ACP fallback." },
     } as MockTtsReply);
     mockRoutedTextTurn("Visible ACP fallback.");
-    routeMocks.routeReply
-      .mockResolvedValueOnce({ ok: true, delivered: false, suppressed: true })
-      .mockResolvedValueOnce({ ok: true, delivered: true, messageId: "fallback" });
+    routeMocks.routeReply.mockResolvedValueOnce({ ok: true, delivered: false, suppressed: true });
 
     await runDispatch({
       bodyForAgent: "reply",
@@ -3031,12 +3029,11 @@ describe("tryDispatchAcpReplyCore", () => {
       originatingTo: "telegram:thread-1",
     });
 
-    expect(routeMocks.routeReply).toHaveBeenCalledTimes(2);
+    expect(routeMocks.routeReply).toHaveBeenCalledTimes(1);
     expect(routePayload(0)).toMatchObject({
       text: "Visible ACP fallback.",
       mediaUrl: "/tmp/openclaw-media/acp-tts.ogg",
     });
-    expect(routePayload(1)).toEqual({ text: "Visible ACP fallback." });
   });
 
   it("delivers deferred Telegram ACP text when the runtime is cancelled", async () => {

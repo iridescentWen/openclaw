@@ -8,7 +8,10 @@
 import type { ChannelAccountSnapshot } from "openclaw/plugin-sdk/channel-contract";
 import { createChannelInboundEnvelopeBuilder } from "openclaw/plugin-sdk/channel-inbound";
 import type { MarkdownTableMode, OpenClawConfig } from "openclaw/plugin-sdk/config-contracts";
-import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
+import {
+  formatErrorMessage,
+  PlatformMessageNotDispatchedError,
+} from "openclaw/plugin-sdk/error-runtime";
 import type { ReplyPayload } from "openclaw/plugin-sdk/reply-runtime";
 import { normalizeLowercaseStringOrEmpty } from "openclaw/plugin-sdk/string-coerce-runtime";
 import { checkTwitchAccessControl } from "./access-control.js";
@@ -135,7 +138,7 @@ async function processTwitchMessage(params: {
             durable: () => ({
               to: `twitch:channel:${message.channel}`,
             }),
-            deliver: async (payload) => {
+            deliver: async (payload, info) => {
               return await deliverTwitchReply({
                 payload,
                 channel: message.channel,
@@ -144,6 +147,7 @@ async function processTwitchMessage(params: {
                 config,
                 tableMode,
                 runtime,
+                onPlatformSendDispatch: info.onPlatformSendDispatch,
               });
             },
             onDelivered: (_payload, _info, result) => {
@@ -178,6 +182,7 @@ async function deliverTwitchReply(params: {
   config: unknown;
   tableMode: MarkdownTableMode;
   runtime: TwitchRuntimeEnv;
+  onPlatformSendDispatch: () => Promise<void>;
 }): Promise<{ visibleReplySent: boolean }> {
   const { payload, channel, account, accountId, config, runtime } = params;
 
@@ -197,6 +202,7 @@ async function deliverTwitchReply(params: {
     if (!textToSend) {
       return { visibleReplySent: false };
     }
+    await params.onPlatformSendDispatch();
     const result = await clientManager.sendMessage(
       account,
       channel,
@@ -209,6 +215,9 @@ async function deliverTwitchReply(params: {
     }
     return { visibleReplySent: true };
   } catch (err) {
+    if (err instanceof PlatformMessageNotDispatchedError) {
+      throw err;
+    }
     runtime.error?.(`Failed to send reply: ${String(err)}`);
     return { visibleReplySent: false };
   }

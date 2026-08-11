@@ -1842,6 +1842,8 @@ describe("main-session-restart-recovery", () => {
       pendingFinalDelivery: {
         kind: "replayable",
         text: pendingPayload,
+        intentId: "pending-final-intent",
+        deliveries: [{ id: "pending-final-delivery", state: "prepared" }],
         createdAt: Date.now() - 5_000,
         context: {
           channel: "discord",
@@ -1887,9 +1889,70 @@ describe("main-session-restart-recovery", () => {
     expect(entry?.pendingFinalDelivery).toMatchObject({
       kind: "replayable",
       text: pendingPayload,
+      deliveries: [{ id: "pending-final-delivery", state: "prepared" }],
     });
     expect(entry?.restartRecoveryForceSafeTools).toBe(true);
     expect(entry?.pendingFinalDelivery?.createdAt).toBeLessThanOrEqual(beforeStoreRead);
+  });
+
+  it("terminalizes an ambiguous pending final without replaying its content", async () => {
+    const sessionsDir = await makeSessionsDir();
+    await writeMainSession({
+      sessionsDir,
+      pendingFinalDelivery: makePendingFinalDelivery("do not replay this answer", {
+        intentId: "ambiguous-intent",
+        deliveries: [{ id: "ambiguous-delivery", state: "unknown" }],
+        context: {
+          channel: "telegram",
+          to: "chat-1",
+          accountId: "default",
+          threadId: 42,
+        },
+      }),
+    });
+
+    await expectRecovery({ recovered: 1, failed: 0, skipped: 0 });
+
+    expect(callGateway).not.toHaveBeenCalled();
+    const entry = readStore(path.join(sessionsDir, "sessions.json"))["agent:main:main"];
+    expect(entry).toMatchObject({
+      status: "done",
+      abortedLastRun: false,
+      pendingDeliveryNotice: {
+        intentId: "ambiguous-intent",
+        state: "owed",
+        context: {
+          channel: "telegram",
+          to: "chat-1",
+          accountId: "default",
+          threadId: 42,
+        },
+      },
+    });
+    expect(entry?.pendingFinalDelivery).toBeUndefined();
+  });
+
+  it("quietly completes a pending final whose deliveries are all terminal", async () => {
+    const sessionsDir = await makeSessionsDir();
+    await writeMainSession({
+      sessionsDir,
+      pendingFinalDelivery: makePendingFinalDelivery("already accounted for", {
+        intentId: "terminal-intent",
+        deliveries: [
+          { id: "delivered-part", state: "delivered" },
+          { id: "suppressed-part", state: "suppressed" },
+        ],
+        context: { channel: "telegram", to: "chat-1", accountId: "default" },
+      }),
+    });
+
+    await expectRecovery({ recovered: 1, failed: 0, skipped: 0 });
+
+    expect(callGateway).not.toHaveBeenCalled();
+    const entry = readStore(path.join(sessionsDir, "sessions.json"))["agent:main:main"];
+    expect(entry?.status).toBe("done");
+    expect(entry?.pendingFinalDelivery).toBeUndefined();
+    expect(entry?.pendingDeliveryNotice).toBeUndefined();
   });
 
   it("keeps a hook-owned pending final behind the unsafe-hook gate after claim cleanup", async () => {

@@ -87,6 +87,7 @@ export async function recoverRestartAbortedMainSessions(params: {
     const storeResult = await recoverStore({
       cfg: params.cfg,
       onExhaustedTarget: params.onExhaustedTarget,
+      stateDir: params.stateDir,
       storePath,
       resumedSessionKeys,
       activeSessionIds: params.activeSessionIds,
@@ -116,6 +117,7 @@ export async function retryRestartAbortedMainSessionRecovery(params: {
   expectedRecoverySourceRunId?: string;
   expectedSessionId: string;
   sessionKey: string;
+  stateDir?: string;
   storePath: string;
   gatewayRuntime: GatewayRecoveryRuntime;
 }): Promise<RecoveryCounts> {
@@ -145,6 +147,7 @@ async function recoverExpectedRestartRecovery(params: {
   lifecycleGeneration?: string;
   observationOnly?: boolean;
   sessionKey: string;
+  stateDir?: string;
   shouldContinue?: () => boolean;
   storePath: string;
   gatewayRuntime: GatewayRecoveryRuntime;
@@ -185,6 +188,7 @@ async function recoverExpectedRestartRecovery(params: {
         await recoverStore({
           cfg: params.cfg,
           observationOnly: params.observationOnly,
+          stateDir: params.stateDir,
           storePath: params.storePath,
           resumedSessionKeys: new Set<string>(),
           expectedClaim: params.expectedClaim,
@@ -208,6 +212,7 @@ export function scheduleRestartAbortedMainSessionRecoveryAfterOwnerRelease(param
   maxRetries?: number;
   expectedSessionId: string;
   sessionKey: string;
+  stateDir?: string;
   storePath: string;
 }): void {
   const recover = () =>
@@ -220,6 +225,7 @@ export function scheduleRestartAbortedMainSessionRecoveryAfterOwnerRelease(param
         cfg: params.getConfig(),
         expectedSessionId: params.expectedSessionId,
         sessionKey: params.sessionKey,
+        stateDir: params.stateDir,
         storePath: params.storePath,
         gatewayRuntime,
       });
@@ -325,6 +331,7 @@ export function scheduleRestartAbortedMainSessionRecovery(params: {
             lifecycleGeneration,
             observationOnly: true,
             sessionKey: target.sessionKey,
+            stateDir: params.stateDir,
             shouldContinue,
             storePath: target.storePath,
             gatewayRuntime: params.gatewayRuntime,

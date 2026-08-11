@@ -282,9 +282,10 @@ export const reefPlugin: ChannelPlugin<ReefAccount> = {
           commandAuthorized: false,
           // ReefMessageFlow invokes ingress only after peer trust and guard approval.
           inboundAccessAuthorized: true,
-          deliver: async (payload) => {
+          deliver: async (payload, info) => {
             const text = replyText(payload);
             if (text.trim()) {
+              await info.onPlatformSendDispatch();
               await flow.send(message.peer, text, {
                 thread: message.thread ?? message.id,
                 replyTo: message.id,
@@ -322,7 +323,6 @@ export const reefPlugin: ChannelPlugin<ReefAccount> = {
       });
       const receiptNotifier = new ReefReceiptNotifier(
         async (notice) => {
-          let resendText = "";
           let dispatchFailure: Error | undefined;
           await dispatchInboundDirectDm({
             cfg: ctx.cfg,
@@ -343,14 +343,20 @@ export const reefPlugin: ChannelPlugin<ReefAccount> = {
               ReefEnvelopeId: notice.messageId,
               SenderIsBot: true,
             },
-            deliver: async (payload) => {
+            deliver: async (payload, info) => {
               if (!notice.allowResend) {
                 return;
               }
               const text = replyText(payload);
-              if (text.trim()) {
-                resendText = text;
+              if (!isRephrasedReefResend(text, notice.originalTextHash)) {
+                return;
               }
+              await info.onPlatformSendDispatch();
+              await flow.send(notice.peer, text, {
+                replyTo: notice.messageId,
+                expectedRecipient: notice.recipient,
+                resendDisabled: true,
+              });
             },
             onRecordError: (error) =>
               ctx.log?.error?.(`reef rejection notice record failed: ${String(error)}`),
@@ -363,15 +369,6 @@ export const reefPlugin: ChannelPlugin<ReefAccount> = {
           });
           if (dispatchFailure) {
             throw dispatchFailure;
-          }
-          if (notice.allowResend && isRephrasedReefResend(resendText, notice.originalTextHash)) {
-            // A guard-recovery send gets one attempt. Its own rejection must
-            // notify the agent but never open another automatic resend turn.
-            await flow.send(notice.peer, resendText, {
-              replyTo: notice.messageId,
-              expectedRecipient: notice.recipient,
-              resendDisabled: true,
-            });
           }
         },
         {

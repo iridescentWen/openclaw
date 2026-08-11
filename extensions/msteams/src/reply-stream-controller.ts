@@ -453,6 +453,16 @@ export function createTeamsReplyStreamController(params: {
       }
     },
 
+    finalPayloadEmitRequiresCustody(payload: ReplyPayload): boolean {
+      if (!stream || wasCanceled() || !payload.text) {
+        return false;
+      }
+      if (replacementSettlementPending) {
+        return replacementFinalPending;
+      }
+      return !tokensEmitted && !streamFailed && streamMode === "progress";
+    },
+
     preparePayload(payload: ReplyPayload): Maybe<ReplyPayload> {
       if (!stream) {
         return payload;

@@ -220,8 +220,12 @@ describe("createMSTeamsReplyDispatcher", () => {
     }
     return {
       onReplyStart: created.dispatcherOptions.onReplyStart,
-      deliver: (payload) => created.delivery.deliver(payload, { kind: "final" }),
+      deliver: (payload) => created.delivery.deliver(payload, finalDeliveryInfo()),
     };
+  }
+
+  function finalDeliveryInfo() {
+    return { kind: "final" as const, onPlatformSendDispatch: async () => {} };
   }
 
   function pipelineArgs(): PipelineArgs {
@@ -473,7 +477,7 @@ describe("createMSTeamsReplyDispatcher", () => {
     const dispatcher = createDispatcher("personal", { streaming: { mode } });
     dispatcher.replyOptions.onPartialReply?.({ text: "original partial" });
     await dispatcher.replyOptions.onToolStart?.({ name: "exec" });
-    await dispatcher.delivery.deliver({ text: "authoritative final" }, { kind: "final" });
+    await dispatcher.delivery.deliver({ text: "authoritative final" }, finalDeliveryInfo());
     await dispatcher.dispatcherOptions.onSettled?.();
 
     const stream = getStreamMock();
@@ -860,7 +864,7 @@ describe("createMSTeamsReplyDispatcher", () => {
     });
 
     expect(dispatcher.delivery.observeMessageSent).toBe(true);
-    const result = await dispatcher.delivery.deliver({ text: "hello" }, { kind: "final" });
+    const result = await dispatcher.delivery.deliver({ text: "hello" }, finalDeliveryInfo());
     let settled = false;
     void result?.finalization?.then(() => {
       settled = true;
@@ -887,7 +891,7 @@ describe("createMSTeamsReplyDispatcher", () => {
       { onSentMessageIds },
     );
 
-    const result = await dispatcher.delivery.deliver({ text: "hello" }, { kind: "final" });
+    const result = await dispatcher.delivery.deliver({ text: "hello" }, finalDeliveryInfo());
     await dispatcher.dispatcherOptions.onSettled?.();
 
     await expect(result?.finalization).resolves.toEqual({
@@ -900,7 +904,10 @@ describe("createMSTeamsReplyDispatcher", () => {
     const dispatcher = createDispatcher("personal");
     dispatcher.replyOptions.onPartialReply?.({ text: "streamed" });
 
-    const result = await dispatcher.delivery.deliver({ text: "streamed final" }, { kind: "final" });
+    const result = await dispatcher.delivery.deliver(
+      { text: "streamed final" },
+      finalDeliveryInfo(),
+    );
     expect(getStreamMock().close).not.toHaveBeenCalled();
 
     await dispatcher.dispatcherOptions.onSettled?.();
@@ -951,7 +958,7 @@ describe("createMSTeamsReplyDispatcher", () => {
     dispatcher.replyOptions.onPartialReply?.({ text: "provider final" });
     const results = [];
     for (const payload of payloads) {
-      results.push(await dispatcher.delivery.deliver(payload, { kind: "final" }));
+      results.push(await dispatcher.delivery.deliver(payload, finalDeliveryInfo()));
     }
     await dispatcher.dispatcherOptions.onSettled?.();
 
@@ -978,9 +985,9 @@ describe("createMSTeamsReplyDispatcher", () => {
     dispatcher.replyOptions.onPartialReply?.({ text: "provider final" });
     const nativeResult = await dispatcher.delivery.deliver(
       { text: "provider final" },
-      { kind: "final" },
+      finalDeliveryInfo(),
     );
-    await dispatcher.delivery.deliver({ text: "second payload" }, { kind: "final" });
+    await dispatcher.delivery.deliver({ text: "second payload" }, finalDeliveryInfo());
 
     expect(sendMSTeamsMessagesMock).not.toHaveBeenCalled();
     await dispatcher.dispatcherOptions.onSettled?.();
@@ -1010,7 +1017,7 @@ describe("createMSTeamsReplyDispatcher", () => {
       },
     );
 
-    const result = await dispatcher.delivery.deliver({ text: "hello" }, { kind: "final" });
+    const result = await dispatcher.delivery.deliver({ text: "hello" }, finalDeliveryInfo());
     await dispatcher.dispatcherOptions.onSettled?.();
 
     await expect(result?.finalization).resolves.toEqual({
@@ -1030,7 +1037,7 @@ describe("createMSTeamsReplyDispatcher", () => {
       streaming: { block: { enabled: false } },
     });
 
-    const result = await dispatcher.delivery.deliver({ text: "attachment" }, { kind: "final" });
+    const result = await dispatcher.delivery.deliver({ text: "attachment" }, finalDeliveryInfo());
     const finalization = expect(result?.finalization).rejects.toBe(failure);
     await dispatcher.dispatcherOptions.onSettled?.();
     await finalization;

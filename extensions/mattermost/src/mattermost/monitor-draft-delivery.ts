@@ -51,6 +51,7 @@ type MattermostDraftPreviewDeliverParams = {
   previewState: MattermostDraftPreviewState;
   logVerboseMessage: (message: string) => void;
   deliverPayload: (payload: ReplyPayload) => Promise<MattermostReplyDeliveryResult>;
+  onPlatformSendDispatch?: () => Promise<void>;
   // Visible same-thread finals can be delivered by editing the draft preview in
   // place (onPreviewFinalized) without ever calling deliverPayload; this lets the
   // caller record thread participation on that path too.
@@ -156,6 +157,7 @@ export async function deliverMattermostReplyWithDraftPreview(
           return { message: previewFinalText };
         },
         editFinal: async (previewPostId, edit) => {
+          await params.onPlatformSendDispatch?.();
           finalizedPreviewPost = await updateMattermostPost(params.client, previewPostId, edit);
         },
         resolveFinalizedId: (previewPostId) => finalizedPreviewPost?.id ?? previewPostId,

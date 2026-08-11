@@ -418,27 +418,6 @@ export async function chooseDispatchRoute(state: PrepareDispatchOperationReadySt
           cfg,
         });
       }
-      const fallbackText =
-        deferFinalTtsText && normalizedPayload.mediaUrl
-          ? normalizeOptionalString(normalizedPayload.text)
-          : undefined;
-      if (fallbackText && !isRoutedReplyDelivered(result)) {
-        const fallbackResult = await state.routeReplyToOriginating(
-          { text: fallbackText },
-          {
-            abortSignal,
-            kind: "final",
-            ...(hasTranscriptOwner ? { mirror: false } : {}),
-          },
-        );
-        if (fallbackResult && isRoutedReplyDelivered(fallbackResult)) {
-          await mirrorDeliveredReplyToTranscript({
-            metadata: sourceReplyTranscriptMirror,
-            cfg,
-          });
-          return { queuedFinal: true, routedFinalCount: 1 };
-        }
-      }
       return {
         queuedFinal: result.ok,
         routedFinalCount: isRoutedReplyDelivered(result) ? 1 : 0,

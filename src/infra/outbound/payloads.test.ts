@@ -2,6 +2,10 @@
 // interactive blocks, mirror text, and suppressed relay status payloads.
 import { resolveSendableOutboundReplyParts } from "openclaw/plugin-sdk/reply-payload";
 import { describe, expect, it } from "vitest";
+import {
+  getReplyPayloadMetadata,
+  setReplyPayloadMetadata,
+} from "../../auto-reply/reply-payload.js";
 import { markInboundContextLabel } from "../../auto-reply/reply/inbound-context-marker.js";
 import type { ReplyPayload } from "../../auto-reply/types.js";
 import { typedCases } from "../../test-utils/typed-cases.js";
@@ -571,6 +575,26 @@ describe("OutboundPayloadPlan projections", () => {
       { text: '{"action":"NO_REPLY","note":"keep"}', mediaUrls: [] },
       { text: "", mediaUrls: [], channelData: { mode: "flex" } },
     ]);
+  });
+
+  it("preserves pending-final custody through transport projection", () => {
+    const completion = {
+      context: { channel: "telegram", to: "chat-1", accountId: "default" },
+      createdAt: 100,
+      deliveryId: "delivery-1",
+      intentId: "intent-1",
+      sessionId: "session-1",
+      sessionKey: "agent:main:telegram:direct:chat-1",
+      storePath: "/tmp/sessions.json",
+    };
+    const payload = setReplyPayloadMetadata(
+      { text: "hello" },
+      { pendingFinalDeliveryCompletion: completion },
+    );
+
+    const [projected] = projectOutboundPayloadPlanForOutbound(createOutboundPayloadPlan([payload]));
+
+    expect(getReplyPayloadMetadata(projected!)?.pendingFinalDeliveryCompletion).toEqual(completion);
   });
 
   it("matches normalizeOutboundPayloadsForJson", () => {

@@ -85,7 +85,10 @@ export function createMatrixReplyDispatcher(config: {
   const dispatcherOptions = {
     ...prefixOptions,
     humanDelay,
-    deliver: async (payload: ReplyPayload, info: { kind: string }) => {
+    deliver: async (
+      payload: ReplyPayload,
+      info: { kind: string; onPlatformSendDispatch: () => Promise<void> },
+    ) => {
       const completeDelivery = async (
         result: MatrixReplyDeliveryResult,
       ): Promise<MatrixReplyDeliveryResult> => {
@@ -160,6 +163,7 @@ export function createMatrixReplyDispatcher(config: {
               accountId,
               mediaLocalRoots,
               tableMode,
+              onPlatformSendDispatch: info.onPlatformSendDispatch,
             }),
           );
         }
@@ -210,6 +214,7 @@ export function createMatrixReplyDispatcher(config: {
           }).convertedText;
           let finalizedDraftContent = draftStream.content() ?? preparedFinalPreviewContent;
           let fallbackResult: MatrixReplyDeliveryResult | undefined;
+          let previewEditDispatched = false;
           const previewResult = await deliverWithFinalizableLivePreviewAdapter<
             ReplyPayload,
             string,
@@ -239,6 +244,8 @@ export function createMatrixReplyDispatcher(config: {
               }),
               editFinal: async (_draftEventId, edit) => {
                 if (edit.finalizeLive) {
+                  await info.onPlatformSendDispatch();
+                  previewEditDispatched = true;
                   if (!(await draftStream.finalizeLive())) {
                     throw new Error("Matrix draft live finalize failed");
                   }
@@ -246,6 +253,8 @@ export function createMatrixReplyDispatcher(config: {
                   return;
                 }
                 const { editMessageMatrix } = await loadMatrixSendModule();
+                await info.onPlatformSendDispatch();
+                previewEditDispatched = true;
                 await editMessageMatrix(roomId, _draftEventId, edit.text, {
                   client,
                   cfg,
@@ -260,6 +269,7 @@ export function createMatrixReplyDispatcher(config: {
                 }).convertedText;
               },
               createPreviewReceipt: createDraftReceipt,
+              handlePreviewEditError: () => (previewEditDispatched ? "retain" : "fallback"),
               logPreviewEditFailure: (err) => {
                 logVerboseMessage(`matrix: preview final edit failed: ${String(err)}`);
               },
@@ -283,6 +293,7 @@ export function createMatrixReplyDispatcher(config: {
                   accountId,
                   mediaLocalRoots,
                   tableMode,
+                  onPlatformSendDispatch: info.onPlatformSendDispatch,
                 });
               } catch (error: unknown) {
                 throw toMatrixPartialDeliveryError(error, [survivingDraft]);
@@ -293,7 +304,9 @@ export function createMatrixReplyDispatcher(config: {
           });
           draftController.markDraftConsumed();
           const settledResult =
-            previewResult.kind === "preview-finalized" && previewResult.liveState?.receipt
+            (previewResult.kind === "preview-finalized" ||
+              previewResult.kind === "preview-retained") &&
+            previewResult.liveState?.receipt
               ? createDraftDeliveryResult(
                   draftEventId,
                   finalizedDraftContent ?? preparedFinalPreviewContent,
@@ -328,6 +341,7 @@ export function createMatrixReplyDispatcher(config: {
             textEditOk = false;
           } else if (textEditOk && payloadText && requiresFinalTextEdit) {
             const { editMessageMatrix, prepareMatrixSingleText } = await loadMatrixSendModule();
+            await info.onPlatformSendDispatch();
             textEditOk = await editMessageMatrix(roomId, draftEventId, payloadText, {
               client,
               cfg,
@@ -346,6 +360,7 @@ export function createMatrixReplyDispatcher(config: {
               () => false,
             );
           } else if (textEditOk && reusesDraftTextUnchanged) {
+            await info.onPlatformSendDispatch();
             textEditOk = await draftStream.finalizeLive();
             finalizedDraftContent = draftStream.content();
           }
@@ -389,6 +404,7 @@ export function createMatrixReplyDispatcher(config: {
               accountId,
               mediaLocalRoots,
               tableMode,
+              onPlatformSendDispatch: info.onPlatformSendDispatch,
             });
           } catch (error: unknown) {
             throw toMatrixPartialDeliveryError(error, [previewDelivery]);
@@ -428,6 +444,7 @@ export function createMatrixReplyDispatcher(config: {
             accountId,
             mediaLocalRoots,
             tableMode,
+            onPlatformSendDispatch: info.onPlatformSendDispatch,
           });
         } catch (error: unknown) {
           throw toMatrixPartialDeliveryError(error, [survivingDraft]);
@@ -454,6 +471,7 @@ export function createMatrixReplyDispatcher(config: {
           accountId,
           mediaLocalRoots,
           tableMode,
+          onPlatformSendDispatch: info.onPlatformSendDispatch,
         }),
       );
     },

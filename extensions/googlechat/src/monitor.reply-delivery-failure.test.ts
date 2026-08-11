@@ -155,6 +155,7 @@ async function runDelivery(params: {
       runtime,
       core,
       config,
+      onPlatformSendDispatch: async () => {},
       ...(params.statusSink ? { statusSink: params.statusSink } : {}),
       ...(params.withTypingMessage
         ? {

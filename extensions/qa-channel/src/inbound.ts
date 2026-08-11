@@ -452,6 +452,7 @@ export async function handleQaInbound(params: {
           }
           // A streamed preview is never the durable generated-image delivery.
           await preview.clear();
+          await info.onPlatformSendDispatch();
           await sendQaChannelMediaBatch({
             cfg: params.config,
             accountId: params.account.accountId,
@@ -471,6 +472,7 @@ export async function handleQaInbound(params: {
         if (!text.trim()) {
           return;
         }
+        await info.onPlatformSendDispatch();
         await preview.deliver(text, info?.kind ?? "final", reply?.isError);
       },
       onError: (error) => {

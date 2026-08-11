@@ -73,7 +73,7 @@ export async function dispatchDiscordNativeAgentReply(params: {
     },
     ctxPayload: params.ctxPayload,
     delivery: {
-      deliver: async (payload) => {
+      deliver: async (payload, info) => {
         if (params.suppressReplies) {
           return {
             visibleReplySent: false,
@@ -95,6 +95,7 @@ export async function dispatchDiscordNativeAgentReply(params: {
           preferFollowUp: params.preferFollowUp || didReply,
           responseEphemeral: params.responseEphemeral,
           chunkMode: resolveChunkMode(params.cfg, "discord", params.accountId),
+          onPlatformSendDispatch: info.onPlatformSendDispatch,
         });
         didReply ||= payloadDelivered;
         return payloadDelivered

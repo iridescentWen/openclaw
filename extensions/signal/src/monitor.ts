@@ -317,6 +317,7 @@ export async function deliverReplies(params: {
   chunkMode: "length" | "newline";
   replyContext?: SignalNativeReplyContext;
   chatType?: "direct" | "group";
+  onPlatformSendDispatch?: () => Promise<void>;
 }) {
   const {
     replies,
@@ -378,6 +379,7 @@ export async function deliverReplies(params: {
       text: reply.text,
       chunkText: (value) => chunkTextWithMode(value, textLimit, chunkMode),
       sendText: async (chunk) => {
+        await params.onPlatformSendDispatch?.();
         recordDeliveryResult(
           await sendMessageSignal(target, chunk, {
             cfg: params.cfg,
@@ -392,6 +394,7 @@ export async function deliverReplies(params: {
       },
       sendMedia: async ({ mediaUrl, caption }) => {
         const visibleText = caption ?? "";
+        await params.onPlatformSendDispatch?.();
         recordDeliveryResult(
           await sendMessageSignal(target, visibleText, {
             cfg: params.cfg,

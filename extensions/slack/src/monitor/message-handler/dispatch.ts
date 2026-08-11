@@ -80,7 +80,7 @@ export async function dispatchPreparedSlackMessage(prepared: PreparedSlackMessag
 
   const deliverSlackPayload = async (
     payload: ReplyPayload,
-    info: { kind: ReplyDispatchKind },
+    info: { kind: ReplyDispatchKind; onPlatformSendDispatch: () => Promise<void> },
   ): Promise<{ visibleReplySent: false } | void> => {
     if (payload.isReasoning === true) {
       return { visibleReplySent: false };
@@ -100,6 +100,7 @@ export async function dispatchPreparedSlackMessage(prepared: PreparedSlackMessag
           payload,
           kind: info.kind,
           forcedThreadTs: finalThreadTs,
+          onPlatformSendDispatch: info.onPlatformSendDispatch,
         });
         // Complete the cards only after the fresh final landed; a failed send
         // leaves completion to the outer cleanup, which can mark error state.
@@ -116,11 +117,16 @@ export async function dispatchPreparedSlackMessage(prepared: PreparedSlackMessag
         payload,
         kind: info.kind,
         forcedThreadTs: delivery.streamSession?.threadTs ?? delivery.nativeProgressStreamThreadTs,
+        onPlatformSendDispatch: info.onPlatformSendDispatch,
       });
       return;
     }
     if (useStreaming) {
-      await delivery.deliverWithStreaming({ payload, kind: info.kind });
+      await delivery.deliverWithStreaming({
+        payload,
+        kind: info.kind,
+        onPlatformSendDispatch: info.onPlatformSendDispatch,
+      });
       return;
     }
 
@@ -174,6 +180,7 @@ export async function dispatchPreparedSlackMessage(prepared: PreparedSlackMessag
         await draftStream.seal();
         try {
           const finalized = await draftStream.finalizeMessage(messageId, async () => {
+            await info.onPlatformSendDispatch();
             await finalizeSlackPreviewEdit({
               client: slackClient,
               token: ctx.botToken,
@@ -206,6 +213,7 @@ export async function dispatchPreparedSlackMessage(prepared: PreparedSlackMessag
                   },
               kind: info.kind,
               forcedThreadTs: finalThreadTs,
+              onPlatformSendDispatch: info.onPlatformSendDispatch,
             });
             delivered = true;
           } finally {
@@ -223,6 +231,7 @@ export async function dispatchPreparedSlackMessage(prepared: PreparedSlackMessag
           payload: buildTtsSupplementMediaPayload(payload),
           kind: info.kind,
           forcedThreadTs: finalThreadTs,
+          onPlatformSendDispatch: info.onPlatformSendDispatch,
         });
         delivery.markPreviewPayloadDelivered({ kind: info.kind, payload, threadTs: finalThreadTs });
         progress.progressDraft.markFinalReplyDelivered();
@@ -271,6 +280,7 @@ export async function dispatchPreparedSlackMessage(prepared: PreparedSlackMessag
             return;
           }
           const finalized = await draftStream?.finalizeMessage(preview.messageId, async () => {
+            await info.onPlatformSendDispatch();
             await finalizeSlackPreviewEdit({
               client: slackClient,
               token: ctx.botToken,
@@ -324,6 +334,7 @@ export async function dispatchPreparedSlackMessage(prepared: PreparedSlackMessag
             payload: supplementalPayload,
             kind: info.kind,
             forcedThreadTs: previewThreadTs,
+            onPlatformSendDispatch: info.onPlatformSendDispatch,
           });
           delivery.markPreviewPayloadDelivered({
             kind: info.kind,
@@ -346,6 +357,7 @@ export async function dispatchPreparedSlackMessage(prepared: PreparedSlackMessag
               }
             : payload,
           kind: info.kind,
+          onPlatformSendDispatch: info.onPlatformSendDispatch,
         });
       },
     });

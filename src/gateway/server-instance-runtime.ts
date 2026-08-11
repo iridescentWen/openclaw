@@ -112,7 +112,7 @@ export function createGatewayInstanceRuntime(
         threadId: payload.threadId,
         content: payload.text,
         gatewayOwnedDelivery: true,
-        bestEffort: true,
+        bestEffort: false,
         idempotencyKey: payload.idempotencyKey,
         deliveryIntentId: payload.idempotencyKey,
         reusePendingDeliveryIntent: true,
@@ -122,6 +122,16 @@ export function createGatewayInstanceRuntime(
       if (result.deliveryStatus === "failed" || result.deliveryStatus === "partial_failed") {
         throw new Error(result.error ?? "recovery notice delivery failed");
       }
+      if (
+        result.deliveryStatus === "suppressed" &&
+        result.payloadOutcomes?.some(
+          (outcome) =>
+            outcome.status === "suppressed" && outcome.reason === "adapter_returned_no_identity",
+        )
+      ) {
+        throw new Error("Recovery notice delivery outcome is unconfirmed");
+      }
+      return result.deliveryStatus === "suppressed" ? "suppressed" : "sent";
     },
   };
   const releaseRecoveryRuntime = registerGatewayRecoveryRuntime(recovery);

@@ -14,6 +14,7 @@ import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "openclaw/plugin
 import { buildChannelInboundEventContext } from "openclaw/plugin-sdk/channel-inbound";
 import { bindIngressLifecycleToReplyOptions } from "openclaw/plugin-sdk/channel-outbound";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-contracts";
+import { PlatformMessageNotDispatchedError } from "openclaw/plugin-sdk/error-runtime";
 import { isSilentReplyPayloadText, SILENT_REPLY_TOKEN } from "openclaw/plugin-sdk/reply-chunking";
 import type { FinalizedMsgContext } from "openclaw/plugin-sdk/reply-runtime";
 import { truncateUtf16Safe } from "openclaw/plugin-sdk/text-utility-runtime";
@@ -487,7 +488,10 @@ export async function dispatchOutbound(
           },
         },
         delivery: {
-          deliver: async (payload: ReplyDeliverPayload, info: { kind: string }) => {
+          deliver: async (
+            payload: ReplyDeliverPayload,
+            info: { kind: string; onPlatformSendDispatch: () => Promise<void> },
+          ) => {
             hasResponse = true;
 
             if (info.kind === "tool") {
@@ -498,6 +502,7 @@ export async function dispatchOutbound(
                 if (toolOnlyTimeoutId || hasPendingToolFallbackPayload()) {
                   renewToolOnlyFallback();
                 }
+                await info.onPlatformSendDispatch();
                 await sendTextOnlyReply(
                   textOnlyProgress,
                   {
@@ -531,6 +536,7 @@ export async function dispatchOutbound(
                 toolMediaUrls.length = 0;
                 for (const mediaUrl of urlsToSend) {
                   try {
+                    await info.onPlatformSendDispatch();
                     await sendMedia({
                       to: qualifiedTarget,
                       text: "",
@@ -569,8 +575,12 @@ export async function dispatchOutbound(
               !isMediaOnlyBlockReply(payload)
             ) {
               try {
+                await info.onPlatformSendDispatch();
                 await streamingController.onDeliver(payload);
               } catch (err) {
+                if (err instanceof PlatformMessageNotDispatchedError) {
+                  throw err;
+                }
                 log?.error(
                   `Streaming deliver error: ${err instanceof Error ? err.message : String(err)}`,
                 );
@@ -617,6 +627,7 @@ export async function dispatchOutbound(
             const deliverActx = { account, qualifiedTarget, log, ...gatewayMediaContext };
 
             // 1. Media tags
+            await info.onPlatformSendDispatch();
             const mediaResult = await parseAndSendMediaTags(
               replyText,
               deliverEvent,

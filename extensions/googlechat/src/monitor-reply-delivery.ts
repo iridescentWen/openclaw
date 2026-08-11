@@ -2,7 +2,12 @@
 import { resolveSendableOutboundReplyParts } from "openclaw/plugin-sdk/reply-payload";
 import type { OpenClawConfig } from "../runtime-api.js";
 import type { ResolvedGoogleChatAccount } from "./accounts.js";
-import { deleteGoogleChatMessage, sendGoogleChatMessage, updateGoogleChatMessage } from "./api.js";
+import {
+  deleteGoogleChatMessage,
+  GoogleChatApiError,
+  sendGoogleChatMessage,
+  updateGoogleChatMessage,
+} from "./api.js";
 import type { GoogleChatCoreRuntime, GoogleChatRuntimeEnv } from "./monitor-types.js";
 
 export type GoogleChatTypingMessage =
@@ -49,6 +54,7 @@ export async function deliverGoogleChatReply(params: {
   config: OpenClawConfig;
   statusSink?: (patch: { lastInboundAt?: number; lastOutboundAt?: number }) => void;
   typingMessage?: GoogleChatTypingMessage;
+  onPlatformSendDispatch: () => Promise<void>;
 }): Promise<void> {
   const { payload, account, spaceId, runtime, core, config, statusSink } = params;
   // Clear this whenever the typing message is deleted or unavailable; otherwise
@@ -110,6 +116,7 @@ export async function deliverGoogleChatReply(params: {
     }
   };
   const sendTextMessage = async (chunk: string) => {
+    await params.onPlatformSendDispatch();
     const sent = await sendGoogleChatMessage({
       account,
       space: spaceId,
@@ -126,23 +133,24 @@ export async function deliverGoogleChatReply(params: {
       continue;
     }
     if (firstTextChunk && typingMessage) {
+      await params.onPlatformSendDispatch();
       try {
         await updateGoogleChatMessage({
           account,
           messageName: typingMessage.name,
           text: chunk,
         });
-      } catch (err) {
-        // The typing placeholder may already be gone; resend the chunk as a new
-        // message below. Only the resend failing counts as a delivery failure.
-        runtime.error?.(`Google Chat message send failed: ${String(err)}`);
+      } catch (error) {
+        if (!(error instanceof GoogleChatApiError) || error.status !== 404) {
+          throw error;
+        }
+        runtime.error?.(`Google Chat typing update failed: ${String(error)}`);
         typingMessage = undefined;
+        await sendTextMessage(chunk);
       }
-      if (typingMessage) {
-        firstTextChunk = false;
-        recordOutboundStatus();
-        continue;
-      }
+      firstTextChunk = false;
+      recordOutboundStatus();
+      continue;
     }
     // Core delivery contract: a failed send must reject so the reply dispatcher
     // routes to onError instead of recording a dropped chunk as delivered.

@@ -107,6 +107,7 @@ export async function executeDispatch(state: PrepareDispatchExecutionReadyState)
     didDeliverVisiblePartialReply = true;
     state.progressState.accumulatedBlockText = "";
     state.progressState.accumulatedBlockTtsText = "";
+    state.progressState.accumulatedBlockTtsMetadataSource = undefined;
     return true;
   };
   const replyResult = await runWithDispatchLifecycleAdmission(
@@ -482,6 +483,7 @@ export async function executeDispatch(state: PrepareDispatchExecutionReadyState)
                         state.progressState.accumulatedBlockTtsText += "\n";
                       }
                       state.progressState.accumulatedBlockTtsText += payload.text;
+                      state.progressState.accumulatedBlockTtsMetadataSource = payload;
                       state.progressState.blockCount++;
                     }
                     let visiblePayload =
