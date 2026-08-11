@@ -177,6 +177,7 @@ const accountAppPolicyEntrySchema = z
     source: z.literal("account"),
     appName: z.string(),
     allowDestructiveActions: z.boolean(),
+    allowOpenWorld: z.boolean().optional(),
     destructiveApprovalMode: destructiveApprovalModeSchema,
     mcpServerNames: z.array(z.string()),
   })
@@ -191,6 +192,7 @@ const pluginAppPolicyEntrySchema = z
     ]),
     pluginName: z.string(),
     allowDestructiveActions: z.boolean(),
+    allowOpenWorld: z.boolean().optional(),
     destructiveApprovalMode: destructiveApprovalModeSchema,
     mcpServerNames: z.array(z.string()),
   })
@@ -1432,6 +1434,7 @@ function readPluginAppPolicyContext(
         "appId" in entry ||
         typeof entry.appName !== "string" ||
         typeof entry.allowDestructiveActions !== "boolean" ||
+        (entry.allowOpenWorld !== undefined && typeof entry.allowOpenWorld !== "boolean") ||
         destructiveApprovalMode === "invalid" ||
         !mcpServerNamesValid
       ) {
@@ -1441,6 +1444,9 @@ function readPluginAppPolicyContext(
         source: "account",
         appName: entry.appName,
         allowDestructiveActions: entry.allowDestructiveActions,
+        ...(typeof entry.allowOpenWorld === "boolean"
+          ? { allowOpenWorld: entry.allowOpenWorld }
+          : {}),
         ...(destructiveApprovalMode ? { destructiveApprovalMode } : {}),
         mcpServerNames: entry.mcpServerNames as string[],
       };
@@ -1454,6 +1460,7 @@ function readPluginAppPolicyContext(
         entry.marketplaceName !== CODEX_PLUGINS_WORKSPACE_MARKETPLACE_NAME) ||
       typeof entry.pluginName !== "string" ||
       typeof entry.allowDestructiveActions !== "boolean" ||
+      (entry.allowOpenWorld !== undefined && typeof entry.allowOpenWorld !== "boolean") ||
       destructiveApprovalMode === "invalid" ||
       !mcpServerNamesValid
     ) {
@@ -1464,6 +1471,9 @@ function readPluginAppPolicyContext(
       marketplaceName: entry.marketplaceName,
       pluginName: entry.pluginName,
       allowDestructiveActions: entry.allowDestructiveActions,
+      ...(typeof entry.allowOpenWorld === "boolean"
+        ? { allowOpenWorld: entry.allowOpenWorld }
+        : {}),
       ...(destructiveApprovalMode ? { destructiveApprovalMode } : {}),
       mcpServerNames: entry.mcpServerNames as string[],
     };
