@@ -633,12 +633,7 @@ describe("skills cli commands", () => {
       source: "git",
     });
 
-    await runCommand([
-      "skills",
-      "install",
-      "git:owner/tools",
-      "--dangerously-force-unsafe-install",
-    ]);
+    await runCommand(["skills", "install", "git:owner/tools"]);
 
     const installArgs = mockFirstObjectArg(installSkillFromSourceMock);
     expectObjectFields(installArgs, {
@@ -646,7 +641,6 @@ describe("skills cli commands", () => {
       spec: "git:owner/tools",
       force: false,
       config: {},
-      dangerouslyForceUnsafeInstall: true,
     });
     expect(installArgs.slug).toBeUndefined();
     expectLogger(installArgs.logger);
@@ -825,10 +819,6 @@ describe("skills cli commands", () => {
   it.each([
     { flag: "--force-install", option: "forceInstall" },
     { flag: "--acknowledge-clawhub-risk", option: "acknowledgeClawHubRisk" },
-    {
-      flag: "--dangerously-force-unsafe-install",
-      option: "dangerouslyForceUnsafeInstall",
-    },
   ])("passes $flag through for ClawHub skill installs", async ({ flag, option }) => {
     primeCalendarInstall();
 
@@ -930,10 +920,6 @@ describe("skills cli commands", () => {
   it.each([
     { flag: "--force-install", option: "forceInstall" },
     { flag: "--acknowledge-clawhub-risk", option: "acknowledgeClawHubRisk" },
-    {
-      flag: "--dangerously-force-unsafe-install",
-      option: "dangerouslyForceUnsafeInstall",
-    },
   ])("passes $flag through for ClawHub skill updates", async ({ flag, option }) => {
     primeCalendarUpdate();
 

@@ -316,7 +316,6 @@ export async function installSkillFromClawHub(params: {
   onClawHubRisk?: (request: ClawHubRiskAcknowledgementRequest) => boolean | Promise<boolean>;
   logger?: Logger;
   config?: OpenClawConfig;
-  dangerouslyForceUnsafeInstall?: boolean;
   onInstallPolicyWarning?: InstallSafetyOverrides["onInstallPolicyWarning"];
   /** True when a Claw lifecycle caller already owns package coordination. */
   clawManaged?: boolean;
@@ -339,7 +338,6 @@ export async function updateSkillsFromClawHub(params: {
   onClawHubRisk?: (request: ClawHubRiskAcknowledgementRequest) => boolean | Promise<boolean>;
   logger?: Logger;
   config?: OpenClawConfig;
-  dangerouslyForceUnsafeInstall?: boolean;
   onInstallPolicyWarning?: InstallSafetyOverrides["onInstallPolicyWarning"];
 }): Promise<UpdateClawHubSkillResult[]> {
   const lock = await readClawHubSkillsLockfile(params.workspaceDir);
@@ -380,7 +378,6 @@ export async function updateSkillsFromClawHub(params: {
           onClawHubRisk: params.onClawHubRisk,
           logger: params.logger,
           config: params.config,
-          dangerouslyForceUnsafeInstall: params.dangerouslyForceUnsafeInstall,
           onInstallPolicyWarning: params.onInstallPolicyWarning,
         }),
       { required: true },

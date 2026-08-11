@@ -7,7 +7,7 @@ export type InstallPolicyWarningAcknowledgementRequest = {
   requestMode: "install" | "update";
 };
 
-export type InstallPolicyWarningAcknowledgementResult =
+type InstallPolicyWarningAcknowledgementResult =
   | { status: "approved" }
   | { status: "declined" }
   | {

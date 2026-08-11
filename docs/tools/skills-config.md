@@ -177,7 +177,16 @@ The policy receives one JSON object on stdin with `protocolVersion: 1`,
 optional structured `source`, structured `origin`, and `request`. It must
 write one JSON object on stdout with an `allow`, `warn`, or `block` decision.
 `warn` and `block` require a non-empty `reason`; every decision may include a
-`findings` array. A warning stops the install before commit. Interactive CLI
+`findings` array. Each finding requires non-empty string `ruleId` and `message`
+fields plus a `severity` of `info`, `warn`, or `critical`. Optional `file` and
+`evidence` values must be non-empty strings; a finite numeric `line` is rounded
+down and clamped to at least 1. Malformed finding entries are ignored, and
+invalid optional fields are omitted. A non-array `findings` value is treated as
+absent. Operator-facing reason and finding text are limited to 1,000 characters.
+OpenClaw retains at most 100 normalized findings for display. Only a `warn`
+response with more than 100 valid findings fails closed and cannot be
+acknowledged; `allow` and `block` retain the first 100. A warning stops the
+install before commit. Interactive CLI
 plugin and skill commands ask the operator to type the target name using the
 same `install anyway` or `update anyway` copy as suspicious ClawHub releases,
 then run policy again before continuing. Declined and non-interactive commands
@@ -186,10 +195,10 @@ every approved warning is re-evaluated before continuing.
 The flag is consumed by the first warning in one command; a later warning
 fails closed and requires interactive review.
 Gateway-backed and automatic installs remain
-blocked on warnings because they have no operator-confirmation flow. The deprecated
-`--dangerously-force-unsafe-install` flag remains a no-op. A `block`, non-zero
-exit, timeout, malformed JSON, missing field, or unsupported protocol version
-always fails closed.
+blocked on warnings because they have no operator-confirmation flow. A `block`,
+non-zero exit, timeout, invalid JSON, non-object response, missing or invalid
+protocol version or decision, or missing or empty `warn`/`block` reason always
+fails closed.
 
 OpenClaw does not execute install policy during normal Gateway startup.
 Installs and updates fail closed when policy is enabled but unavailable.

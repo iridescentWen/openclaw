@@ -640,11 +640,6 @@ export function registerSkillsCli(program: Command) {
       false,
     )
     .option(
-      "--dangerously-force-unsafe-install",
-      "Deprecated no-op; security.installPolicy may still block",
-      false,
-    )
-    .option(
       "--acknowledge-install-policy-warning",
       "Acknowledge security.installPolicy warnings without prompting; blocks and failures remain terminal",
       false,
@@ -666,7 +661,6 @@ export function registerSkillsCli(program: Command) {
           acknowledgeClawhubRisk?: boolean;
           acknowledgeClawHubRisk?: boolean;
           acknowledgeInstallPolicyWarning?: boolean;
-          dangerouslyForceUnsafeInstall?: boolean;
           global?: boolean;
           agent?: string;
           as?: string;
@@ -698,7 +692,6 @@ export function registerSkillsCli(program: Command) {
               config,
               ...resolveInstallPolicyWarningAcknowledgementCliOptions({
                 acknowledgeInstallPolicyWarning: opts.acknowledgeInstallPolicyWarning,
-                dangerouslyForceUnsafeInstall: opts.dangerouslyForceUnsafeInstall,
               }),
               logger: {
                 info: (message) => defaultRuntime.log(message),
@@ -735,7 +728,6 @@ export function registerSkillsCli(program: Command) {
             config,
             ...resolveInstallPolicyWarningAcknowledgementCliOptions({
               acknowledgeInstallPolicyWarning: opts.acknowledgeInstallPolicyWarning,
-              dangerouslyForceUnsafeInstall: opts.dangerouslyForceUnsafeInstall,
             }),
             ...(opts.forceInstall ? { forceInstall: true } : {}),
             ...resolveSkillClawHubRiskOptions(
@@ -778,11 +770,6 @@ export function registerSkillsCli(program: Command) {
       false,
     )
     .option(
-      "--dangerously-force-unsafe-install",
-      "Deprecated no-op; security.installPolicy may still block",
-      false,
-    )
-    .option(
       "--acknowledge-install-policy-warning",
       "Acknowledge security.installPolicy warnings without prompting; blocks and failures remain terminal",
       false,
@@ -798,7 +785,6 @@ export function registerSkillsCli(program: Command) {
           acknowledgeClawhubRisk?: boolean;
           acknowledgeClawHubRisk?: boolean;
           acknowledgeInstallPolicyWarning?: boolean;
-          dangerouslyForceUnsafeInstall?: boolean;
           global?: boolean;
           agent?: string;
         },
@@ -830,7 +816,6 @@ export function registerSkillsCli(program: Command) {
             ...(opts.forceInstall ? { forceInstall: true } : {}),
             ...resolveInstallPolicyWarningAcknowledgementCliOptions({
               acknowledgeInstallPolicyWarning: opts.acknowledgeInstallPolicyWarning,
-              dangerouslyForceUnsafeInstall: opts.dangerouslyForceUnsafeInstall,
             }),
             ...resolveSkillClawHubRiskOptions(
               opts.acknowledgeClawhubRisk === true || opts.acknowledgeClawHubRisk === true,

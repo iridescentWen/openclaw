@@ -204,7 +204,6 @@ async function installLocalSkillDir(params: {
   timeoutMs?: number;
   logger?: Logger;
   config?: OpenClawConfig;
-  dangerouslyForceUnsafeInstall?: boolean;
   onInstallPolicyWarning?: InstallSafetyOverrides["onInstallPolicyWarning"];
   git?: SkillSourceOrigin["git"];
 }): Promise<SkillSourceInstallResult> {
@@ -222,7 +221,6 @@ async function installLocalSkillDir(params: {
     logger: params.logger,
     policy: {
       config: params.config,
-      dangerouslyForceUnsafeInstall: params.dangerouslyForceUnsafeInstall,
       onInstallPolicyWarning: params.onInstallPolicyWarning,
       installId: params.source,
       origin: {
@@ -275,7 +273,6 @@ async function installGitSkill(params: {
   timeoutMs?: number;
   logger?: Logger;
   config?: OpenClawConfig;
-  dangerouslyForceUnsafeInstall?: boolean;
   onInstallPolicyWarning?: InstallSafetyOverrides["onInstallPolicyWarning"];
 }): Promise<SkillSourceInstallResult> {
   const parsed = parseGitPluginSpec(params.spec);
@@ -357,7 +354,6 @@ async function installGitSkill(params: {
       timeoutMs: params.timeoutMs,
       logger: params.logger,
       config: params.config,
-      dangerouslyForceUnsafeInstall: params.dangerouslyForceUnsafeInstall,
       onInstallPolicyWarning: params.onInstallPolicyWarning,
       git,
     });
@@ -372,7 +368,6 @@ async function installPathSkill(params: {
   timeoutMs?: number;
   logger?: Logger;
   config?: OpenClawConfig;
-  dangerouslyForceUnsafeInstall?: boolean;
   onInstallPolicyWarning?: InstallSafetyOverrides["onInstallPolicyWarning"];
 }): Promise<SkillSourceInstallResult> {
   const sourceDir = resolveUserPath(params.spec);
@@ -396,7 +391,6 @@ async function installPathSkill(params: {
     timeoutMs: params.timeoutMs,
     logger: params.logger,
     config: params.config,
-    dangerouslyForceUnsafeInstall: params.dangerouslyForceUnsafeInstall,
     onInstallPolicyWarning: params.onInstallPolicyWarning,
   });
 }
@@ -420,7 +414,6 @@ export async function installSkillFromSource(params: {
   timeoutMs?: number;
   logger?: Logger;
   config?: OpenClawConfig;
-  dangerouslyForceUnsafeInstall?: boolean;
   onInstallPolicyWarning?: InstallSafetyOverrides["onInstallPolicyWarning"];
 }): Promise<SkillSourceInstallResult> {
   const spec = params.spec.trim();

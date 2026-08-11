@@ -1160,7 +1160,6 @@ export async function preflightPluginGitInstallPolicyRuntime(params: {
 
 export async function evaluateSkillInstallPolicyRuntime(params: {
   config?: OpenClawConfig;
-  dangerouslyForceUnsafeInstall?: boolean;
   installId: string;
   installSpec?: SkillInstallSpec;
   logger: InstallScanLogger;
@@ -1175,7 +1174,6 @@ export async function evaluateSkillInstallPolicyRuntime(params: {
   const runPolicy = () =>
     runOperatorInstallPolicy({
       config: params.config,
-      dangerouslyForceUnsafeInstall: params.dangerouslyForceUnsafeInstall,
       logger: params.logger,
       onInstallPolicyWarning: params.onInstallPolicyWarning,
       origin: params.origin,

@@ -467,34 +467,67 @@ describe("runInstallPolicy", () => {
     expect(first?.warning?.fingerprint).not.toBe(second?.warning?.fingerprint);
   });
 
-  it("fingerprints warning findings beyond the display limit", async () => {
-    const visibleFindings = Array.from({ length: 100 }, (_, index) => ({
-      ruleId: `visible-${String(index)}`,
+  it("fails closed when a warning has more valid findings than can be reviewed", async () => {
+    const findings = Array.from({ length: 101 }, (_, index) => ({
+      ruleId: `finding-${String(index)}`,
       severity: "warn",
-      message: `Visible finding ${String(index)}`,
+      message: `Finding ${String(index)}`,
     }));
-    const runWarning = async (extraMessage: string) =>
+    const runWarning = async (warningFindings: typeof findings) =>
       await runInstallPolicy({
         config: configWithPolicy(scriptPath, {
           POLICY_RESPONSE: JSON.stringify({
             protocolVersion: 1,
             decision: "warn",
             reason: "review all findings",
-            findings: [
-              ...visibleFindings,
-              { ruleId: "hidden-100", severity: "warn", message: extraMessage },
-            ],
+            findings: warningFindings,
           }),
         }),
         request: baseRequest(sourceDir),
       });
 
-    const first = await runWarning("First hidden finding");
-    const second = await runWarning("Second hidden finding");
+    const boundary = await runWarning(findings.slice(0, 100));
+    const result = await runWarning(findings);
 
-    expect(first?.findings).toEqual(second?.findings);
-    expect(first?.findings).toHaveLength(100);
-    expect(first?.warning?.fingerprint).not.toBe(second?.warning?.fingerprint);
+    expect(boundary?.warning).toBeDefined();
+    expect(boundary?.findings).toHaveLength(100);
+    expect(result?.blocked?.code).toBe("security_scan_failed");
+    expect(result?.blocked?.reason).toContain("more than 100 valid findings");
+    expect(result?.warning).toBeUndefined();
+    expect(result?.findings).toBeUndefined();
+  });
+
+  it("selects display findings after dropping malformed entries", async () => {
+    const result = await runInstallPolicy({
+      config: configWithPolicy(scriptPath, {
+        POLICY_RESPONSE: JSON.stringify({
+          protocolVersion: 1,
+          decision: "warn",
+          reason: "review valid findings",
+          findings: [
+            ...Array.from({ length: 100 }, () => ({ severity: "warn", message: "invalid" })),
+            {
+              ruleId: "valid-after-malformed-prefix",
+              severity: "critical",
+              message: "Review this critical finding.",
+            },
+          ],
+        }),
+      }),
+      request: baseRequest(sourceDir),
+    });
+
+    expect(result?.warning).toEqual({
+      reason: "review valid findings",
+      fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+    expect(result?.findings).toEqual([
+      {
+        ruleId: "valid-after-malformed-prefix",
+        severity: "critical",
+        message: "Review this critical finding.",
+      },
+    ]);
   });
 
   it.each([
