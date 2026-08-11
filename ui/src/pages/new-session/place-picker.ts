@@ -6,9 +6,16 @@ import type {
 import { icons } from "../../components/icons.ts";
 import { t } from "../../i18n/index.ts";
 import { renderCloudProfileMenuItems, renderSessionMenuItem } from "./cloud-target.ts";
-import type { BrowserTarget, DraftBranches, DraftCloudProfile, DraftNode } from "./discovery.ts";
+import type {
+  BrowserTarget,
+  DraftBranches,
+  DraftCloudProfile,
+  DraftEnvironment,
+  DraftNode,
+} from "./discovery.ts";
 import { folderDisplayName, isKnownWorkspacePath } from "./path.ts";
 import { disambiguate, isPhoneFamily, nodeTooltip } from "./place-labels.ts";
+import { resolvePlacePickerSections } from "./place-picker-sections.ts";
 import { recentPlaces, type RecentPlaceSource } from "./recent-places.ts";
 
 function parentFolderDisplayName(path: string): string | undefined {
@@ -159,6 +166,7 @@ export function renderPlaceSelect(params: {
   projectId: string;
   sessions: readonly RecentPlaceSource[];
   execNodes: DraftNode[];
+  environments: DraftEnvironment[] | null;
   gatewayName: string;
   cloudProfiles: DraftCloudProfile[];
   cloudProfileId: string;
@@ -217,6 +225,7 @@ export function renderPlaceSelect(params: {
   const activeProfile = params.cloudProfiles.find(
     (profile) => profile.id === params.cloudProfileId,
   );
+  const { deviceNodes, cloudProfiles } = resolvePlacePickerSections(params);
   const gatewayLabel = params.gatewayName
     ? t("newSession.gatewayNamed", { name: params.gatewayName })
     : t("newSession.gateway");
@@ -229,12 +238,12 @@ export function renderPlaceSelect(params: {
   const effectiveFolder = folder || params.workspace;
   const recents = recentPlaces(params.sessions, {
     workspace: params.workspace,
-    execNodes: params.execNodes,
+    execNodes: deviceNodes,
     allowGatewayFolder: (recentFolder) =>
       params.isAdmin || isKnownWorkspacePath(params.workspaceRoots, recentFolder),
   });
   const recentItems = recents.map((recent) => {
-    const node = params.execNodes.find((candidate) => candidate.nodeId === recent.execNode);
+    const node = deviceNodes.find((candidate) => candidate.nodeId === recent.execNode);
     const recentLabel =
       params.showDestinations && node
         ? `${folderDisplayName(recent.folder)} · ${node.displayName}`
@@ -248,7 +257,7 @@ export function renderPlaceSelect(params: {
     (recent) => recent.node?.remoteIp,
     (recent) => `${recent.folder}${recent.execNode ? ` · ${recent.execNode.slice(0, 8)}` : ""}`,
   ]);
-  const nodeSuffixes = disambiguate(params.execNodes, (node) => node.displayName, [
+  const nodeSuffixes = disambiguate(deviceNodes, (node) => node.displayName, [
     (node) => node.modelIdentifier,
     (node) => node.remoteIp,
     (node) => node.nodeId.slice(0, 8),
@@ -407,40 +416,53 @@ export function renderPlaceSelect(params: {
 
               ${params.showDestinations
                 ? html`
-                    <div class="new-session-page__menu-title">${t("newSession.places")}</div>
+                    <div class="new-session-page__menu-title">${t("newSession.gateway")}</div>
                     ${renderSessionMenuItem(
                       {
                         value: "gateway",
                         label: gatewayLabel,
                         icon: icons.monitor,
                         checked: !params.execNode && !params.cloudProfileId,
+                        checkAtEnd: true,
                         onSelect: () => params.onSelectExecNode(""),
                       },
                       params.submitting,
                     )}
-                    ${params.execNodes.map((node, index) =>
-                      renderSessionMenuItem(
-                        {
-                          value: `node:${node.nodeId}`,
-                          label: node.displayName,
-                          icon: isPhoneFamily(node.deviceFamily)
-                            ? icons.monitorSmartphone
-                            : icons.monitor,
-                          sub: nodeSuffixes[index],
-                          checked: params.execNode === node.nodeId,
-                          title: nodeTooltip(node),
-                          onSelect: () => params.onSelectExecNode(node.nodeId),
-                        },
-                        params.submitting,
-                      ),
-                    )}
+                    ${deviceNodes.length > 0
+                      ? html`
+                          <div class="new-session-page__menu-title">${t("tabs.devices")}</div>
+                          ${deviceNodes.map((node, index) =>
+                            renderSessionMenuItem(
+                              {
+                                value: `node:${node.nodeId}`,
+                                label: node.displayName,
+                                icon: isPhoneFamily(node.deviceFamily)
+                                  ? icons.monitorSmartphone
+                                  : icons.monitor,
+                                sub: nodeSuffixes[index],
+                                checked: params.execNode === node.nodeId,
+                                checkAtEnd: true,
+                                title: nodeTooltip(node),
+                                onSelect: () => params.onSelectExecNode(node.nodeId),
+                              },
+                              params.submitting,
+                            ),
+                          )}
+                        `
+                      : nothing}
+                    ${cloudProfiles.length > 0 || (params.cloudProfileId && !activeProfile)
+                      ? html`<div class="new-session-page__menu-title">
+                          ${t("newSession.cloud")}
+                        </div>`
+                      : nothing}
                     ${renderCloudProfileMenuItems({
-                      profiles: params.cloudProfiles,
+                      profiles: cloudProfiles,
                       selectedId: params.cloudProfileId,
                       submitting: params.submitting,
                       icon: icons.server,
                       disabled: !params.worktreeAvailable || Boolean(params.cloudDisabledReason),
                       disabledReason: params.cloudDisabledReason,
+                      checkAtEnd: true,
                       onSelect: params.onSelectCloudProfile,
                     })}
                     ${params.cloudProfileId && !activeProfile
@@ -452,6 +474,7 @@ export function renderPlaceSelect(params: {
                             }),
                             icon: icons.server,
                             checked: true,
+                            checkAtEnd: true,
                             disabled: true,
                             title: t("newSession.catalogUnavailable"),
                             onSelect: () => undefined,
