@@ -71,7 +71,6 @@ export type ClawHubInstallParams = {
   onClawHubRisk?: (request: ClawHubRiskAcknowledgementRequest) => boolean | Promise<boolean>;
   logger?: Logger;
   config?: OpenClawConfig;
-  dangerouslyForceUnsafeInstall?: boolean;
   onInstallPolicyWarning?: InstallSafetyOverrides["onInstallPolicyWarning"];
   clawManaged?: boolean;
 };
@@ -312,7 +311,6 @@ async function installArchiveResolution(params: {
   force?: boolean;
   logger?: Logger;
   config?: OpenClawConfig;
-  dangerouslyForceUnsafeInstall?: boolean;
   onInstallPolicyWarning?: InstallSafetyOverrides["onInstallPolicyWarning"];
 }) {
   return await withExtractedArchiveRoot({
@@ -329,7 +327,6 @@ async function installArchiveResolution(params: {
         logger: params.logger,
         policy: {
           config: params.config,
-          dangerouslyForceUnsafeInstall: params.dangerouslyForceUnsafeInstall,
           onInstallPolicyWarning: params.onInstallPolicyWarning,
           installId: "clawhub",
           origin: {
@@ -362,7 +359,6 @@ async function installGitHubResolution(params: {
   force?: boolean;
   logger?: Logger;
   config?: OpenClawConfig;
-  dangerouslyForceUnsafeInstall?: boolean;
   onInstallPolicyWarning?: InstallSafetyOverrides["onInstallPolicyWarning"];
 }) {
   // Preserve the repository root for sourcePath selection. Root markers validate
@@ -380,7 +376,6 @@ async function installGitHubResolution(params: {
         logger: params.logger,
         policy: {
           config: params.config,
-          dangerouslyForceUnsafeInstall: params.dangerouslyForceUnsafeInstall,
           onInstallPolicyWarning: params.onInstallPolicyWarning,
           installId: "clawhub",
           origin: {
@@ -591,7 +586,6 @@ export async function performClawHubSkillInstall(
               force: params.force,
               logger: params.logger,
               config: params.config,
-              dangerouslyForceUnsafeInstall: params.dangerouslyForceUnsafeInstall,
               onInstallPolicyWarning: params.onInstallPolicyWarning,
             })
           : await installArchiveResolution({
@@ -609,7 +603,6 @@ export async function performClawHubSkillInstall(
               force: params.force,
               logger: params.logger,
               config: params.config,
-              dangerouslyForceUnsafeInstall: params.dangerouslyForceUnsafeInstall,
               onInstallPolicyWarning: params.onInstallPolicyWarning,
             });
       if (!install.ok) {

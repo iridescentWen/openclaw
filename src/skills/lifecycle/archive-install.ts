@@ -41,7 +41,6 @@ function hasNonAscii(value: string): boolean {
 
 type SkillArchiveInstallPolicy = {
   config?: OpenClawConfig;
-  dangerouslyForceUnsafeInstall?: boolean;
   onInstallPolicyWarning?: InstallSafetyOverrides["onInstallPolicyWarning"];
   installId?: string;
   origin: InstallPolicyOrigin;
@@ -191,7 +190,6 @@ export async function installExtractedSkillRoot(params: {
     if (params.policy) {
       const scanResult = await evaluateSkillInstallPolicy({
         config: params.policy.config,
-        dangerouslyForceUnsafeInstall: params.policy.dangerouslyForceUnsafeInstall,
         onInstallPolicyWarning: params.policy.onInstallPolicyWarning,
         installId: params.policy.installId ?? "archive",
         logger: params.logger ?? {},

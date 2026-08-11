@@ -9,7 +9,7 @@ import { resolveUserPath, shortenHomePath } from "../utils.js";
 import { isReservedSystemAgentId } from "./agent-id.js";
 import type { SystemAgentOperation } from "./operation-types.js";
 import type { SystemAgentOverview } from "./overview.js";
-import { validateSystemAgentPluginInstallSpec } from "./plugin-install.js";
+import { validateSystemAgentPluginInstallSpec } from "./plugin-install-spec.js";
 
 type SystemAgentOverviewLoader = () => Promise<SystemAgentOverview>;
 type SystemAgentOverviewFormatter = (overview: SystemAgentOverview) => string;

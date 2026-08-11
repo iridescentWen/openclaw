@@ -1,9 +1,6 @@
-import { createHash } from "node:crypto";
 // Checks install policy constraints for package and plugin operations.
 import fs from "node:fs/promises";
 import path from "node:path";
-import { truncateWithMarker } from "@openclaw/normalization-core/utf16-slice";
-import { z } from "zod";
 import type { OpenClawConfig, SecurityConfig } from "../config/types.openclaw.js";
 import { formatErrorMessage } from "../infra/errors.js";
 import { runCommandWithTimeout } from "../process/exec.js";
@@ -11,14 +8,18 @@ import { normalizePositiveInt, normalizePositiveTimerMs } from "../secrets/share
 import { resolveUserPath } from "../utils.js";
 import { resolveRuntimeServiceVersion } from "../version.js";
 import { inspectPathPermissions, safeStat } from "./audit-fs.js";
+import {
+  createInstallPolicyFailure,
+  parseInstallPolicyResponse,
+  type InstallPolicyResult,
+} from "./install-policy-response.js";
 import { isPathInside } from "./scan-paths.js";
+
+export type { InstallPolicyFinding } from "./install-policy-response.js";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_MAX_OUTPUT_BYTES = 1024 * 1024;
 const DEFAULT_MAX_REQUEST_BYTES = 256 * 1024;
-const MAX_REASON_CHARS = 1000;
-const MAX_FINDINGS = 100;
-const MAX_FINDING_TEXT_CHARS = 1000;
 const WINDOWS_ABS_PATH_PATTERN = /^[A-Za-z]:[\\/]/;
 const WINDOWS_UNC_PATH_PATTERN = /^\\\\[^\\]+\\[^\\]+/;
 const POLICY_INTERPRETER_NAMES = new Set([
@@ -70,15 +71,6 @@ export type InstallPolicySource = {
   network: boolean;
 };
 
-export type InstallPolicyFinding = {
-  ruleId: string;
-  severity: "info" | "warn" | "critical";
-  message: string;
-  file?: string;
-  line?: number;
-  evidence?: string;
-};
-
 type InstallPolicyRequest = {
   targetType: InstallPolicyTarget;
   targetName: string;
@@ -118,22 +110,6 @@ type InstallPolicyRequest = {
     extensions?: string[];
   };
 };
-
-type InstallPolicyResult =
-  | { blocked?: undefined; warning?: undefined; findings?: InstallPolicyFinding[] }
-  | {
-      blocked?: undefined;
-      warning: { reason: string; fingerprint: string };
-      findings?: InstallPolicyFinding[];
-    }
-  | {
-      blocked: {
-        code: "security_scan_blocked" | "security_scan_failed";
-        reason: string;
-      };
-      warning?: undefined;
-      findings?: InstallPolicyFinding[];
-    };
 
 type InstallPolicyExecConfig = NonNullable<NonNullable<SecurityConfig["installPolicy"]>["exec"]>;
 
@@ -347,44 +323,6 @@ async function assertSecurePolicyScriptArg(params: {
   }
 }
 
-function truncateText(value: string, maxChars: number): string {
-  return truncateWithMarker(value, maxChars, { marker: "...", reserve: 0, trimEnd: false });
-}
-
-const installPolicyResponseEnvelopeSchema = z.object({
-  protocolVersion: z.literal(1),
-  decision: z.enum(["allow", "warn", "block"]),
-  reason: z.unknown().optional(),
-  findings: z.array(z.unknown()).optional().catch(undefined),
-});
-
-const installPolicyReasonSchema = z.string().trim().min(1);
-
-const findingTextSchema = z.string().trim().min(1);
-
-const optionalFindingTextSchema = findingTextSchema.optional().catch(undefined);
-
-const installPolicyFindingSchema = z
-  .object({
-    ruleId: findingTextSchema,
-    severity: z.enum(["info", "warn", "critical"]),
-    message: findingTextSchema,
-    file: optionalFindingTextSchema,
-    line: z
-      .number()
-      .finite()
-      .transform((value) => Math.max(1, Math.floor(value)))
-      .optional()
-      .catch(undefined),
-    evidence: optionalFindingTextSchema,
-  })
-  .transform(({ evidence, file, line, ...finding }) => ({
-    ...finding,
-    ...(file ? { file } : {}),
-    ...(line !== undefined ? { line } : {}),
-    ...(evidence ? { evidence } : {}),
-  }));
-
 function createPolicyChildEnv(_sourceEnv: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return {};
 }
@@ -397,25 +335,6 @@ function readPassEnvValue(env: NodeJS.ProcessEnv, key: string): string | undefin
   const lowerKey = key.toLowerCase();
   const matchedKey = Object.keys(env).find((candidate) => candidate.toLowerCase() === lowerKey);
   return matchedKey ? env[matchedKey] : undefined;
-}
-
-function blockedByFailure(message: string): InstallPolicyResult {
-  return {
-    blocked: {
-      code: "security_scan_failed",
-      reason: `install policy failed closed: ${truncateText(message, MAX_REASON_CHARS)}`,
-    },
-  };
-}
-
-function blockedByPolicy(reason: string, findings?: InstallPolicyFinding[]): InstallPolicyResult {
-  return {
-    blocked: {
-      code: "security_scan_blocked",
-      reason: `blocked by install policy: ${truncateText(reason, MAX_REASON_CHARS)}`,
-    },
-    ...(findings && findings.length > 0 ? { findings } : {}),
-  };
 }
 
 function isTargetEnabled(params: {
@@ -446,7 +365,7 @@ function resolvePolicy(
   if (!policy.exec) {
     return {
       kind: "failure",
-      result: blockedByFailure(
+      result: createInstallPolicyFailure(
         "security.installPolicy is enabled but security.installPolicy.exec is not configured",
       ),
     };
@@ -512,84 +431,6 @@ export async function validateInstallPolicyStatic(
   return { enabled: true, targets, issues };
 }
 
-function normalizeFinding(value: unknown): InstallPolicyFinding | null {
-  const parsed = installPolicyFindingSchema.safeParse(value);
-  return parsed.success ? parsed.data : null;
-}
-
-function truncateFinding(finding: InstallPolicyFinding): InstallPolicyFinding {
-  return {
-    ruleId: truncateText(finding.ruleId, MAX_FINDING_TEXT_CHARS),
-    severity: finding.severity,
-    message: truncateText(finding.message, MAX_FINDING_TEXT_CHARS),
-    ...(finding.file ? { file: truncateText(finding.file, MAX_FINDING_TEXT_CHARS) } : {}),
-    ...(finding.line !== undefined ? { line: finding.line } : {}),
-    ...(finding.evidence
-      ? { evidence: truncateText(finding.evidence, MAX_FINDING_TEXT_CHARS) }
-      : {}),
-  };
-}
-
-function fingerprintWarning(reason: string, findings: InstallPolicyFinding[]): string {
-  // Presentation is truncated and capped; approval must bind the complete
-  // validated warning so hidden suffix or overflow changes still fail closed.
-  return createHash("sha256").update(JSON.stringify({ reason, findings })).digest("hex");
-}
-
-function formatPolicyResponseEnvelopeError(error: z.ZodError): string {
-  const invalidPath = error.issues[0]?.path[0];
-  return invalidPath === undefined
-    ? "policy response must be a JSON object"
-    : invalidPath === "protocolVersion"
-      ? "policy response protocolVersion must be 1"
-      : 'policy response decision must be "allow", "warn", or "block"';
-}
-
-function parsePolicyResponse(stdout: string): InstallPolicyResult {
-  const trimmed = stdout.trim();
-  if (!trimmed) {
-    return blockedByFailure("policy command returned empty stdout");
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(trimmed) as unknown;
-  } catch (err) {
-    return blockedByFailure(`policy command returned invalid JSON (${formatErrorMessage(err)})`);
-  }
-  const response = installPolicyResponseEnvelopeSchema.safeParse(parsed);
-  if (!response.success) {
-    return blockedByFailure(formatPolicyResponseEnvelopeError(response.error));
-  }
-  const fullFindings = (response.data.findings ?? [])
-    .map(normalizeFinding)
-    .filter((finding): finding is InstallPolicyFinding => finding !== null);
-  const normalizedFindings = (response.data.findings ?? [])
-    .slice(0, MAX_FINDINGS)
-    .map(normalizeFinding)
-    .filter((finding): finding is InstallPolicyFinding => finding !== null)
-    .map(truncateFinding);
-  if (response.data.decision === "allow") {
-    return normalizedFindings.length > 0 ? { findings: normalizedFindings } : {};
-  }
-  const reason = installPolicyReasonSchema.safeParse(response.data.reason);
-  if (!reason.success) {
-    return blockedByFailure(
-      `policy response decision "${response.data.decision}" requires a non-empty reason`,
-    );
-  }
-  if (response.data.decision === "warn") {
-    return {
-      warning: {
-        reason: truncateText(reason.data, MAX_REASON_CHARS),
-        fingerprint: fingerprintWarning(reason.data, fullFindings),
-      },
-      ...(normalizedFindings.length > 0 ? { findings: normalizedFindings } : {}),
-    };
-  }
-  return blockedByPolicy(reason.data, normalizedFindings);
-}
-
 export async function runInstallPolicy(params: {
   config?: OpenClawConfig;
   env?: NodeJS.ProcessEnv;
@@ -608,7 +449,7 @@ export async function runInstallPolicy(params: {
     return result;
   };
   const failClosed = (message: string): InstallPolicyResult =>
-    logBlocked(blockedByFailure(message));
+    logBlocked(createInstallPolicyFailure(message));
 
   let config = params.config;
   if (!config) {
@@ -708,7 +549,7 @@ export async function runInstallPolicy(params: {
     return failClosed(`policy command exited with code ${String(result.code)}`);
   }
 
-  const parsed = parsePolicyResponse(result.stdout);
+  const parsed = parseInstallPolicyResponse(result.stdout);
   if (parsed.blocked) {
     return logBlocked(parsed);
   }
