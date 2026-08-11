@@ -1,8 +1,8 @@
 import { expectDefined } from "@openclaw/normalization-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  InstallSafetyOverrides,
   InstallPolicyWarningAcknowledgementRequest,
-  InstallPolicyWarningAcknowledgementResult,
   InstallPolicyWarningOccurrence,
 } from "./install-security-scan.types.js";
 import {
@@ -248,9 +248,7 @@ describe("plugin management install-policy acknowledgements", () => {
     const acknowledge = expectDefined(
       (
         call[0] as {
-          onInstallPolicyWarning?: (
-            request: InstallPolicyWarningAcknowledgementRequest,
-          ) => Promise<InstallPolicyWarningAcknowledgementResult>;
+          onInstallPolicyWarning?: InstallSafetyOverrides["onInstallPolicyWarning"];
         }
       ).onInstallPolicyWarning,
       "install-policy acknowledgement callback",

@@ -1,12 +1,12 @@
 import { expectDefined } from "@openclaw/normalization-core";
 import { expect } from "vitest";
 import type {
+  InstallSafetyOverrides,
   InstallPolicyWarningAcknowledgementRequest,
-  InstallPolicyWarningAcknowledgementResult,
   InstallPolicyWarningOccurrence,
 } from "../install-security-scan.types.js";
 
-export const officialDiffsWarningOccurrence: InstallPolicyWarningOccurrence = {
+const officialDiffsWarningOccurrence: InstallPolicyWarningOccurrence = {
   warningFingerprint: "review-diffs-warning",
   scan: {
     requestKind: "plugin-archive",
@@ -22,9 +22,7 @@ export const officialDiffsWarningOccurrence: InstallPolicyWarningOccurrence = {
 };
 
 type InstallPolicyWarningCall = {
-  onInstallPolicyWarning?: (
-    request: InstallPolicyWarningAcknowledgementRequest,
-  ) => Promise<InstallPolicyWarningAcknowledgementResult>;
+  onInstallPolicyWarning?: InstallSafetyOverrides["onInstallPolicyWarning"];
 };
 
 export const officialDiffsWarningRequest = {
