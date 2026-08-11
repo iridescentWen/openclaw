@@ -68,6 +68,8 @@ function policyFindingSeverityLabel(severity: PluginInstallPolicyFinding["severi
     case "critical":
       return t("pluginsPage.policyReviewSeverityCritical");
   }
+  const unreachableSeverity: never = severity;
+  return unreachableSeverity;
 }
 
 type PluginsViewProps = {
